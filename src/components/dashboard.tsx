@@ -985,7 +985,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                                           </Avatar>
                                           <h4 className="font-medium">{target.name}</h4>
                                         </div>
-                                        <div className="relative h-12 w-full rounded-lg bg-secondary">
+                                        <div className="relative h-8 w-full rounded-lg bg-secondary">
                                         {ts.schedule.map((entry, index) => {
                                           const task = allTasksForSchedule.find(t => t.id === entry.taskId);
                                           if (!task || !task.originalId) return null;
