@@ -332,24 +332,44 @@ export function Dashboard() {
         const allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
         originalTasksToSchedule.forEach(task => {
           if (task.startTime) {
-            let currentDate = task.startTime;
-            // If the task repeats, find all occurrences in the date range
             if (task.repeatInterval && task.repeatInterval > 0) {
+              // It's a recurring task
+              let currentDate = task.startTime;
+              // Generate occurrences until we are past the schedule's end date
               while (currentDate <= endDay) {
+                // Only add the task if its occurrence falls within the selected scheduling window
                 if (currentDate >= today) {
-                   allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, occurrenceDate: currentDate });
+                  allTaskOccurrences.push({ 
+                    ...task, 
+                    originalId: task.id, 
+                    id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
+                    occurrenceDate: currentDate 
+                  });
                 }
+                // Move to the next occurrence
                 currentDate = addDays(currentDate, task.repeatInterval);
               }
-            } else { // If it doesn't repeat, just add it if it's in the range
-               if (isWithinInterval(task.startTime, { start: today, end: endDay })) {
-                 allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, occurrenceDate: task.startTime });
-               }
+            } else {
+              // It's a non-recurring task, just check if it's in the date range
+              if (isWithinInterval(task.startTime, { start: today, end: endDay })) {
+                allTaskOccurrences.push({ 
+                  ...task, 
+                  originalId: task.id, 
+                  id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, 
+                  occurrenceDate: task.startTime 
+                });
+              }
             }
           } else {
              // For tasks without a start time, let's assume they can be scheduled on any day within the range.
+             // This might need more specific logic depending on requirements for unscheduled tasks.
              datesToSchedule.forEach(day => {
-               allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(day, 'yyyy-MM-dd')}`, occurrenceDate: day });
+               allTaskOccurrences.push({ 
+                 ...task, 
+                 originalId: task.id, 
+                 id: `${task.id}-${format(day, 'yyyy-MM-dd')}`, 
+                 occurrenceDate: day 
+                });
              });
           }
         });
@@ -964,6 +984,8 @@ export function Dashboard() {
     </div>
   );
 }
+
+    
 
     
 
