@@ -23,6 +23,7 @@ import {
   Upload,
   Clock,
   Pencil,
+  FileText,
 } from "lucide-react";
 import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -78,6 +79,7 @@ import { Calendar } from "./ui/calendar";
 import { EditTargetDialog } from "./edit-target-dialog";
 import { EditTaskDialog } from "./edit-task-dialog";
 import { Separator } from "./ui/separator";
+import { ReportView } from "./report-view";
 
 
 const MapView = dynamic(() => import('./map-view').then(mod => mod.MapView), {
@@ -920,8 +922,9 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
               <Tabs defaultValue="daily" className="mt-4">
                 <div className="flex justify-between items-center">
                   <TabsList>
-                    <TabsTrigger value="daily">Schedule View</TabsTrigger>
-                    <TabsTrigger value="map">Map View</TabsTrigger>
+                    <TabsTrigger value="daily"><CalendarIcon className="mr-2 h-4 w-4" />Schedule View</TabsTrigger>
+                    <TabsTrigger value="map"><Map className="mr-2 h-4 w-4" />Map View</TabsTrigger>
+                    <TabsTrigger value="report"><FileText className="mr-2 h-4 w-4" />Report</TabsTrigger>
                   </TabsList>
                 </div>
                 <TabsContent value="daily">
@@ -1077,6 +1080,15 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     activeTaskGroups={activeTaskGroups}
                     />
                 </TabsContent>
+                <TabsContent value="report">
+                  <ReportView 
+                    schedule={generatedSchedule}
+                    tasks={allTasksForSchedule}
+                    targets={targets}
+                    appState={appState}
+                    displayedDates={displayedDates}
+                  />
+                </TabsContent>
               </Tabs>
             )}
           </TabsContent>
@@ -1085,9 +1097,3 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
-
-    
-
-    
-
-    
