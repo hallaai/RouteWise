@@ -1,12 +1,13 @@
 
+
 "use client";
 
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import type { Task } from "@/lib/types";
+import type { Task, Target, GeneratedSchedule } from "@/lib/types";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
-import { cn } from "@/lib/utils";
+import { cn, stringToColor } from "@/lib/utils";
 
 // Leaflet and plugins
 import L from 'leaflet';
@@ -15,20 +16,34 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 
+import { parseISO, format } from "date-fns";
+
+
 interface MapViewProps {
   tasks: Task[];
+  targets: Target[];
+  schedule: GeneratedSchedule | null;
   scheduledTaskIds: Set<string>;
   activeTaskGroups: Set<string>;
 }
 
 type FilterType = "all" | "scheduled" | "unscheduled";
 
+// SVG for the home icon
+const homeIconSvg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="black" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-home">
+    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+`;
 
-export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewProps) {
+
+export function MapView({ tasks, targets, schedule, scheduledTaskIds, activeTaskGroups }: MapViewProps) {
   const [filter, setFilter] = React.useState<FilterType>("all");
   const mapContainerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<L.Map | null>(null);
-  const markersRef = React.useRef<L.MarkerClusterGroup | null>(null);
+  const taskMarkersRef = React.useRef<L.MarkerClusterGroup | null>(null);
+  const routeLayerRef = React.useRef<L.LayerGroup | null>(null);
 
   const filteredTasks = React.useMemo(() => {
     switch (filter) {
@@ -52,7 +67,7 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
     if (mapContainerRef.current && !mapRef.current) {
         mapRef.current = L.map(mapContainerRef.current, {
           attributionControl: false
-        }).setView([61.498, 23.76], 10);
+        }).setView([60.4518, 22.2666], 10);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -60,58 +75,116 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
         
         L.control.attribution({ position: 'bottomleft' }).addTo(mapRef.current);
         
-        markersRef.current = L.markerClusterGroup();
-        mapRef.current.addLayer(markersRef.current);
+        taskMarkersRef.current = L.markerClusterGroup();
+        mapRef.current.addLayer(taskMarkersRef.current);
+
+        routeLayerRef.current = L.layerGroup();
+        mapRef.current.addLayer(routeLayerRef.current);
     }
   }, []);
 
 
   React.useEffect(() => {
-    if (mapRef.current && markersRef.current) {
-        const markerLayer = markersRef.current;
-        markerLayer.clearLayers();
+    if (mapRef.current && taskMarkersRef.current && routeLayerRef.current) {
+        const taskMarkerLayer = taskMarkersRef.current;
+        const routeLayer = routeLayerRef.current;
+        taskMarkerLayer.clearLayers();
+        routeLayer.clearLayers();
 
+        const bounds = L.latLngBounds([]);
+
+        // --- Draw Task Markers ---
         const validTasks = filteredTasks.filter(task => 
             task.location && 
             typeof task.location.lat === 'number' && 
             typeof task.location.lng === 'number'
         );
 
-        if (validTasks.length > 0) {
-            const bounds = L.latLngBounds(validTasks.map(task => [task.location.lat, task.location.lng]));
+        validTasks.forEach(task => {
+            const originalId = task.originalId || task.id;
+            const isHighlighted = activeTaskGroups.has(originalId);
             
-            validTasks.forEach(task => {
-                const originalId = task.originalId || task.id;
-                const isHighlighted = activeTaskGroups.has(originalId);
-                
-                const circleMarker = L.circleMarker([task.location.lat, task.location.lng], {
-                    radius: 8,
-                    fillColor: isHighlighted ? "#ff9933" : "#29abe2",
-                    color: "#ffffff",
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                });
-                
-                const popupContent = `
-                  <div style="font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6;">
-                    <b style="font-size: 16px; font-weight: 600;">${task.name}</b><br>
-                    <strong>Type:</strong> <span style="text-transform: capitalize;">${task.type}</span><br>
-                    <strong>Duration:</strong> ${task.duration} min<br>
-                    <strong>Address:</strong> ${task.location.address}<br>
-                    ${task.segment ? `<strong>Segment:</strong> ${task.segment}<br>` : ''}
-                  </div>
-                `;
-                circleMarker.bindPopup(popupContent);
-                markerLayer.addLayer(circleMarker);
+            const circleMarker = L.circleMarker([task.location.lat, task.location.lng], {
+                radius: 8,
+                fillColor: isHighlighted ? "#ff9933" : "#29abe2",
+                color: "#ffffff",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+            
+            const popupContent = `
+              <div style="font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6;">
+                <b style="font-size: 16px; font-weight: 600;">${task.name}</b><br>
+                <strong>Type:</strong> <span style="text-transform: capitalize;">${task.type}</span><br>
+                <strong>Duration:</strong> ${task.duration} min<br>
+                <strong>Address:</strong> ${task.location.address}<br>
+                ${task.segment ? `<strong>Segment:</strong> ${task.segment}<br>` : ''}
+              </div>
+            `;
+            circleMarker.bindPopup(popupContent);
+            taskMarkerLayer.addLayer(circleMarker);
+            bounds.extend(circleMarker.getLatLng());
+        });
+
+        // --- Draw Routes and Home Icons ---
+        if (schedule) {
+          const scheduledTargets = new Set<string>();
+          Object.values(schedule).flat().forEach(ts => scheduledTargets.add(ts.targetId));
+
+          targets.forEach(target => {
+            if (!scheduledTargets.has(target.id)) return;
+
+            const homeLatLng = L.latLng(target.home_location.lat, target.home_location.lng);
+
+            // Add home icon
+            const homeIcon = L.divIcon({
+              html: homeIconSvg,
+              className: 'home-icon',
+              iconSize: [24, 24],
+              iconAnchor: [12, 24]
             });
 
-            if (mapRef.current && bounds.isValid()) {
-                mapRef.current.fitBounds(bounds.pad(0.1));
+            const homeMarker = L.marker(homeLatLng, { icon: homeIcon })
+              .bindPopup(`<b>${target.name}'s Home</b>`);
+            routeLayer.addLayer(homeMarker);
+            bounds.extend(homeLatLng);
+
+            const routePoints: L.LatLng[] = [homeLatLng];
+            
+            // This assumes we are viewing one day at a time, or routes for the first scheduled day in the range.
+            // For multi-day view, this logic would need to be more complex.
+            const firstDateWithSchedule = Object.keys(schedule).find(date => schedule[date].some(ts => ts.targetId === target.id && ts.schedule.length > 0));
+
+            if (firstDateWithSchedule) {
+              const targetSchedule = schedule[firstDateWithSchedule].find(ts => ts.targetId === target.id);
+              if (targetSchedule) {
+                 targetSchedule.schedule.forEach(entry => {
+                   const task = tasks.find(t => t.id === entry.taskId);
+                   if (task) {
+                     routePoints.push(L.latLng(task.location.lat, task.location.lng));
+                   }
+                 });
+              }
             }
+
+            if(routePoints.length > 1) {
+              routePoints.push(homeLatLng); // Add return to home
+              const routePolyline = L.polyline(routePoints, {
+                color: stringToColor(target.id),
+                weight: 3,
+                opacity: 0.7
+              });
+              routeLayer.addLayer(routePolyline);
+            }
+          });
+        }
+
+        if (mapRef.current && bounds.isValid()) {
+            mapRef.current.fitBounds(bounds.pad(0.1));
         }
     }
-  }, [filteredTasks, activeTaskGroups]);
+  }, [filteredTasks, activeTaskGroups, schedule, targets]);
 
 
   return (
@@ -139,3 +212,4 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
     </Card>
   );
 }
+

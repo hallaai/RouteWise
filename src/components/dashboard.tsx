@@ -72,7 +72,7 @@ import {
 } from "@/components/ui/resizable";
 import { useToast } from "@/hooks/use-toast";
 import type { Task, Target, GeneratedSchedule, TaskType, ScheduleEntry, TargetSchedule, AppState } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, stringToColor } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
@@ -99,21 +99,6 @@ const taskTypeIcons: Record<TaskType, JSX.Element> = {
   maintenance: <Wrench className="h-4 w-4" />,
   installation: <Settings className="h-4 w-4" />,
   cleaning: <Wrench className="h-4 w-4" />, // Example, choose a better icon if available
-};
-
-// Function to generate a color from a string
-const stringToColor = (str: string) => {
-  let hash = 0;
-  if (!str) return '#29ABE2';
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  let color = '#';
-  for (let i = 0; i < 3; i++) {
-    const value = (hash >> (i * 8)) & 0xFF;
-    color += ('00' + value.toString(16)).substr(-2);
-  }
-  return color;
 };
 
 const getTaskType = (work: any): TaskType => {
@@ -1010,7 +995,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
                                           const left = (startOffsetMinutes / totalWorkMinutes) * 100;
                                           const width = (durationMinutes / totalWorkMinutes) * 100;
-                                          const segmentColor = stringToColor(task.segment);
+                                          const segmentColor = stringToColor(task.segment || '');
 
                                           const travelTime = entry.travelTimeFromPrevious || 0;
                                           const travelWidth = (travelTime / totalWorkMinutes) * 100;
@@ -1088,6 +1073,8 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 <TabsContent value="map">
                   <MapView 
                     tasks={tasksForMap} 
+                    targets={targets}
+                    schedule={generatedSchedule}
                     scheduledTaskIds={scheduledTaskIds} 
                     activeTaskGroups={activeTaskGroups}
                     />
