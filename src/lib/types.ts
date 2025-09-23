@@ -1,4 +1,6 @@
 
+export type TaskType = 'pickup' | 'delivery' | 'maintenance' | 'installation' | 'cleaning';
+
 export interface Task {
   id: string;
   name: string;
@@ -8,8 +10,10 @@ export interface Task {
     lng: number;
   };
   duration: number; // in minutes
-  type: 'pickup' | 'delivery' | 'maintenance' | 'installation';
+  type: TaskType;
   priority: 'low' | 'medium' | 'high';
+  startTime?: Date;
+  endTime?: Date;
 }
 
 export interface Target {

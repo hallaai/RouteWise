@@ -15,8 +15,9 @@ import {
   Users,
   Waypoints,
   Wrench,
+  Upload,
 } from "lucide-react";
-import { format, addMinutes, startOfDay, addDays, eachDayOfInterval } from "date-fns";
+import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +60,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { mockTasks, mockTargets } from "@/lib/data";
-import type { Task, Target, GeneratedSchedule } from "@/lib/types";
+import type { Task, Target, GeneratedSchedule, TaskType } from "@/lib/types";
 import { MapView } from "./map-view";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -71,11 +72,24 @@ type SortConfig = {
   direction: "ascending" | "descending";
 } | null;
 
-const taskTypeIcons = {
+const taskTypeIcons: Record<TaskType, JSX.Element> = {
   pickup: <Package className="h-4 w-4" />,
   delivery: <Truck className="h-4 w-4" />,
   maintenance: <Wrench className="h-4 w-4" />,
   installation: <Settings className="h-4 w-4" />,
+  cleaning: <Wrench className="h-4 w-4" />, // Example, choose a better icon if available
+};
+
+
+const getTaskType = (work: any): TaskType => {
+  if (work.segment?.toLowerCase().includes('siivous')) {
+    return 'cleaning';
+  }
+  if (work.type?.toLowerCase() === 'maintenance') {
+    return 'maintenance';
+  }
+  // Add more specific rules if needed
+  return 'maintenance'; // Default fallback
 };
 
 export function Dashboard() {
@@ -103,6 +117,69 @@ export function Dashboard() {
     to: addDays(startOfDay(new Date()), 6),
   });
   const [showExtendDayDialog, setShowExtendDayDialog] = React.useState(false);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const data = JSON.parse(content);
+          
+          if (data.works && data.targets) {
+            const newTasks: Task[] = data.works.map((work: any, index: number) => ({
+              id: work.referenceId || `task-${index}`,
+              name: work.name,
+              location: {
+                address: `${work.address.street}, ${work.address.city}`,
+                lat: work.coordinates.lat,
+                lng: work.coordinates.lon,
+              },
+              duration: work.load || 60, // Default duration if not provided
+              type: getTaskType(work),
+              priority: 'medium', // Default priority
+              startTime: work.startTime ? parseISO(work.startTime) : undefined,
+              endTime: work.endTime ? parseISO(work.endTime) : undefined,
+            }));
+
+            const newTargets: Target[] = data.targets.map((target: any, index: number) => ({
+              id: target.referenceId || `target-${index}`,
+              name: target.name,
+              skills: target.skills.map((skill: any) => skill.name),
+              home_location: {
+                lat: target.coordinates.lat,
+                lng: target.coordinates.lon,
+              },
+              avatarUrl: `https://picsum.photos/seed/${index+1}/200/200`, // Placeholder avatar
+            }));
+            
+            setTasks(newTasks);
+            setTargets(newTargets);
+            setSelectedTaskIds(new Set());
+            setSelectedTargetIds(new Set(newTargets.map(t => t.id)));
+
+            toast({
+              title: "Data Loaded",
+              description: "Tasks and targets have been updated from the JSON file.",
+            });
+          } else {
+            throw new Error("Invalid JSON format. 'works' and 'targets' arrays are required.");
+          }
+
+        } catch (error) {
+          toast({
+            title: "Error loading file",
+            description: (error as Error).message || "Could not parse JSON file.",
+            variant: "destructive",
+          });
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
 
   const handleSelectAllTasks = (checked: boolean) => {
     if (checked) {
@@ -201,17 +278,27 @@ export function Dashboard() {
       const schedule: GeneratedSchedule = {};
       const tasksToSchedule = Array.from(selectedTaskIds);
       const targetsForScheduling = Array.from(selectedTargetIds);
-      const tasksPerTarget = Math.ceil(tasksToSchedule.length / targetsForScheduling.length);
+      
+      const today = dateRange?.from || startOfDay(new Date());
+      const endDay = dateRange?.to || addDays(today, 6);
+      const datesToSchedule = eachDayOfInterval({start: today, end: endDay});
 
-      const today = startOfDay(new Date());
 
-      for (let day = 0; day < 7; day++) {
-        const currentDate = addDays(today, day);
+      datesToSchedule.forEach(currentDate => {
         const dateStr = format(currentDate, "yyyy-MM-dd");
         schedule[dateStr] = [];
 
+        // Distribute tasks among targets for the current day
+        const tasksForThisDay = tasksToSchedule.filter(taskId => {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task?.startTime) return true; // If no start time, can be scheduled any day
+            return format(task.startTime, 'yyyy-MM-dd') === dateStr;
+        });
+
+        const tasksPerTarget = Math.ceil(tasksForThisDay.length / targetsForScheduling.length);
+
         targetsForScheduling.forEach((targetId, targetIndex) => {
-            const targetTasks = tasksToSchedule.slice(
+            const targetTasks = tasksForThisDay.slice(
                 targetIndex * tasksPerTarget,
                 (targetIndex + 1) * tasksPerTarget
             );
@@ -251,7 +338,7 @@ export function Dashboard() {
                 totalTravelTime: totalTravelTime
             });
         });
-      }
+      });
       
       if (!extendDay && !doesScheduleFit(schedule)) {
         setShowExtendDayDialog(true);
@@ -313,6 +400,20 @@ export function Dashboard() {
           <h1 className="text-xl font-semibold">RouteWise Scheduler</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            className="hidden"
+            accept=".json"
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Upload JSON
+          </Button>
           <Button
             onClick={() => handleGenerateSchedule(false)}
             disabled={isLoading}
@@ -431,6 +532,8 @@ export function Dashboard() {
                           </Button>
                         </TableHead>
                         <TableHead>Address</TableHead>
+                        <TableHead>Start Time</TableHead>
+                        <TableHead>End Time</TableHead>
                         <TableHead className="text-right">
                           <Button
                             variant="ghost"
@@ -466,6 +569,8 @@ export function Dashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>{task.location.address}</TableCell>
+                           <TableCell>{task.startTime ? format(task.startTime, 'p') : 'N/A'}</TableCell>
+                          <TableCell>{task.endTime ? format(task.endTime, 'p') : 'N/A'}</TableCell>
                           <TableCell className="text-right">
                             {task.duration}
                           </TableCell>
@@ -615,7 +720,8 @@ export function Dashboard() {
                                   
                                   const target = targets.find(
                                     (t) => t.id === ts.targetId
-                                  )!;
+                                  );
+                                  if (!target) return null;
                                   const workingDayMinutes = workingDayHours[0] * 60;
                                   
                                   return (
@@ -633,7 +739,8 @@ export function Dashboard() {
                                         {ts.schedule.map((entry) => {
                                           const task = tasks.find(
                                             (t) => t.id === entry.taskId
-                                          )!;
+                                          );
+                                          if (!task) return null;
                                           const start = new Date(entry.startTime);
                                           const end = new Date(entry.endTime);
                                           const startOfDayTime = startOfDay(start);
