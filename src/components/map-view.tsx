@@ -2,15 +2,14 @@
 "use client";
 
 import * as React from "react";
-import { Wrapper } from "@googlemaps/react-wrapper";
-import { Map as MapIcon } from "lucide-react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { Icon, LatLngBounds, divIcon } from "leaflet";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Task } from "@/lib/types";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
-
-// You need to add your Google Maps API key here for the map to work.
-const API_KEY = "YOUR_GOOGLE_MAPS_API_KEY";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Circle } from "lucide-react";
 
 interface MapViewProps {
   tasks: Task[];
@@ -20,48 +19,72 @@ interface MapViewProps {
 
 type FilterType = "all" | "scheduled" | "unscheduled";
 
+// Custom hook to update map view when tasks change
+const MapUpdater = ({ tasks }: { tasks: Task[] }) => {
+  const map = useMap();
+  React.useEffect(() => {
+    if (tasks.length > 0) {
+      const bounds = new LatLngBounds(tasks.map(task => [task.location.lat, task.location.lng]));
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+  }, [tasks, map]);
+  return null;
+};
+
+
 export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewProps) {
   const [filter, setFilter] = React.useState<FilterType>("all");
 
   const filteredTasks = React.useMemo(() => {
     switch (filter) {
       case "scheduled":
-        return tasks.filter(task => scheduledTaskIds.has(task.id));
+        return tasks.filter(task => {
+          // A task is considered scheduled if any of its occurrences are in the schedule
+          return scheduledTaskIds.has(task.id);
+        });
       case "unscheduled":
-        return tasks.filter(task => !scheduledTaskids.has(task.id));
+        return tasks.filter(task => !scheduledTaskIds.has(task.id));
       case "all":
       default:
         return tasks;
     }
   }, [tasks, scheduledTaskIds, filter]);
   
+  const createMarkerIcon = (isHighlighted: boolean) => {
+    const iconMarkup = renderToStaticMarkup(
+       <Circle 
+          className={isHighlighted ? 'text-accent' : 'text-primary'}
+          fill={isHighlighted ? 'hsl(var(--accent))' : 'hsl(var(--primary))'}
+          strokeWidth={1}
+          stroke="white"
+          size={isHighlighted ? 18 : 12}
+       />
+    );
+    return divIcon({
+      html: iconMarkup,
+      className: 'bg-transparent border-0',
+      iconSize: [isHighlighted ? 18 : 12, isHighlighted ? 18 : 12],
+      iconAnchor: [isHighlighted ? 9 : 6, isHighlighted ? 9 : 6],
+    });
+  }
 
-  const render = (status: any) => {
-    switch (status) {
-      case "LOADING":
-        return <p>Loading...</p>;
-      case "FAILURE":
-        return <p>Error loading map.</p>;
-      case "SUCCESS":
-        return <GoogleMap tasks={filteredTasks} activeTaskGroups={activeTaskGroups} />;
-    }
-  };
+  // Handle client-side only rendering
+  const [isClient, setIsClient] = React.useState(false);
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
 
-  if (API_KEY === "YOUR_GOOGLE_MAPS_API_KEY") {
+  if (!isClient) {
     return (
-      <Card>
+       <Card>
         <CardHeader>
           <CardTitle>Route Map</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="w-full h-[60vh] bg-secondary rounded-lg flex items-center justify-center">
-            <div className="text-center text-muted-foreground">
-              <MapIcon className="mx-auto h-12 w-12 mb-4" />
-              <p className="font-semibold">Map View Unavailable</p>
-              <p className="text-sm">
-                Please add your Google Maps API key in `src/components/map-view.tsx` to enable this view.
-              </p>
-            </div>
+            <p>Loading Map...</p>
           </div>
         </CardContent>
       </Card>
@@ -89,72 +112,29 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
       </CardHeader>
       <CardContent>
         <div className="w-full h-[60vh] bg-secondary rounded-lg">
-          <Wrapper apiKey={API_KEY} render={render} />
+           <MapContainer center={[61.498, 23.76]} zoom={10} style={{ height: "100%", width: "100%" }}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {filteredTasks.map(task => {
+                const isHighlighted = task.originalId ? activeTaskGroups.has(task.originalId) : activeTaskGroups.has(task.id);
+                return (
+                  <Marker 
+                    key={task.id} 
+                    position={[task.location.lat, task.location.lng]}
+                    icon={createMarkerIcon(isHighlighted)}
+                  >
+                    <Popup>
+                      <b>{task.name}</b><br />{task.location.address}
+                    </Popup>
+                  </Marker>
+                )
+            })}
+             <MapUpdater tasks={filteredTasks} />
+          </MapContainer>
         </div>
       </CardContent>
     </Card>
   );
-}
-
-
-function GoogleMap({ tasks, activeTaskGroups }: { tasks: Task[], activeTaskGroups: Set<string> }) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  const [map, setMap] = React.useState<google.maps.Map>();
-  const markersRef = React.useRef<google.maps.Marker[]>([]);
-
-  React.useEffect(() => {
-    if (ref.current && !map) {
-      setMap(new window.google.maps.Map(ref.current, {
-        center: { lat: 61.498, lng: 23.76 }, // Default center to Tampere
-        zoom: 10,
-      }));
-    }
-  }, [ref, map]);
-
-  React.useEffect(() => {
-    // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current = [];
-
-    if (map && tasks.length > 0) {
-      const bounds = new google.maps.LatLngBounds();
-      tasks.forEach(task => {
-        const position = { lat: task.location.lat, lng: task.location.lng };
-        
-        const isHighlighted = task.originalId ? activeTaskGroups.has(task.originalId) : activeTaskGroups.has(task.id);
-
-        const marker = new google.maps.Marker({
-          position,
-          map,
-          title: task.name,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: isHighlighted ? 10 : 7,
-            fillColor: isHighlighted ? '#FF9933' : '#29ABE2', // Accent for highlighted, primary for others
-            fillOpacity: 1,
-            strokeWeight: 1,
-            strokeColor: '#FFFFFF',
-          }
-        });
-
-        const infowindow = new google.maps.InfoWindow({
-          content: `<b>${task.name}</b><br>${task.location.address}`,
-        });
-
-        marker.addListener("click", () => {
-          infowindow.open({
-            anchor: marker,
-            map,
-            shouldFocus: false,
-          });
-        });
-
-        markersRef.current.push(marker);
-        bounds.extend(position);
-      });
-      map.fitBounds(bounds);
-    }
-  }, [map, tasks, activeTaskGroups]);
-
-  return <div ref={ref} style={{ width: '100%', height: '100%' }} />;
 }
