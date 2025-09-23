@@ -138,3 +138,5 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
     </Card>
   );
 }
+
+    
