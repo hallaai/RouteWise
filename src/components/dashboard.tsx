@@ -19,7 +19,7 @@ import {
   Upload,
   Clock,
 } from "lucide-react";
-import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse, differenceInMinutes, isBefore } from "date-fns";
+import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse, differenceInMinutes, isBefore, isWithinInterval, add } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
 import { Badge } from "@/components/ui/badge";
@@ -181,6 +181,7 @@ export function Dashboard() {
               segment: work.segment,
               startTime: work.startTime ? parseISO(work.startTime) : undefined,
               endTime: work.endTime ? parseISO(work.endTime) : undefined,
+              repeatInterval: work.repeatInterval,
             }));
 
             const newTargets: Target[] = data.targets.map((target: any, index: number) => ({
@@ -314,7 +315,11 @@ export function Dashboard() {
     // A bit of a hack to get around the async nature of setState
     setTimeout(() => {
         const schedule: GeneratedSchedule = {};
-        const tasksToSchedule = new Set(Array.from(selectedTaskIds));
+        
+        const originalTasksToSchedule = Array.from(selectedTaskIds)
+          .map(id => tasks.find(t => t.id === id))
+          .filter((t): t is Task => !!t);
+
         const targetsForScheduling = Array.from(selectedTargetIds)
             .map(id => targets.find(t => t.id === id))
             .filter((t): t is Target => !!t);
@@ -322,10 +327,39 @@ export function Dashboard() {
         const today = dateRange?.from || startOfDay(new Date());
         const endDay = dateRange?.to || addDays(today, 6);
         const datesToSchedule = eachDayOfInterval({ start: today, end: endDay });
+        
+        // Expand recurring tasks
+        const allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
+        originalTasksToSchedule.forEach(task => {
+          if (task.startTime) {
+            if (task.repeatInterval && task.repeatInterval > 0) {
+              let currentDate = task.startTime;
+              while (currentDate <= endDay) {
+                if (isWithinInterval(currentDate, { start: today, end: endDay })) {
+                  allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, occurrenceDate: currentDate });
+                }
+                currentDate = addDays(currentDate, task.repeatInterval);
+              }
+            } else {
+               if (isWithinInterval(task.startTime, { start: today, end: endDay })) {
+                 allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, occurrenceDate: task.startTime });
+               }
+            }
+          } else {
+             // For tasks without a start time, maybe schedule them once? Or handle as per requirements.
+             // For now, let's assume they can be scheduled on any day.
+             // This part might need more clarification on business logic.
+             allTaskOccurrences.push({ ...task, originalId: task.id, occurrenceDate: today });
+          }
+        });
+
 
         datesToSchedule.forEach(currentDate => {
             const dateStr = format(currentDate, "yyyy-MM-dd");
             schedule[dateStr] = [];
+
+            const tasksForThisDay = allTaskOccurrences.filter(t => format(t.occurrenceDate, 'yyyy-MM-dd') === dateStr);
+            const tasksToScheduleThisDay = new Set(tasksForThisDay.map(t => t.id));
 
             targetsForScheduling.forEach(target => {
                 const targetScheduleInfo = target.schedules?.[0];
@@ -345,15 +379,10 @@ export function Dashboard() {
                 const route: TargetSchedule['route'] = [];
 
 
-                const tempTasks = Array.from(tasksToSchedule);
+                const tempTasks = Array.from(tasksToScheduleThisDay);
                 for (const taskId of tempTasks) {
-                    const task = tasks.find(t => t.id === taskId);
+                    const task = tasksForThisDay.find(t => t.id === taskId);
                     if (!task) continue;
-
-                    // Check if task has a specific date and if it matches the current scheduling date
-                    if (task.startTime && format(task.startTime, 'yyyy-MM-dd') !== dateStr) {
-                      continue;
-                    }
 
                     const distance = getDistance(lastLocation.lat, lastLocation.lng, task.location.lat, task.location.lng);
                     const travelTime = Math.round((distance / vehicleSpeed) * 60); // in minutes
@@ -382,7 +411,7 @@ export function Dashboard() {
                         totalTravelTime += travelTime;
                         currentTime = taskEndTime;
                         lastLocation = task.location;
-                        tasksToSchedule.delete(taskId);
+                        tasksToScheduleThisDay.delete(taskId);
                     }
                 }
                 
@@ -431,6 +460,26 @@ export function Dashboard() {
     const to = dateRange.to || dateRange.from;
     return eachDayOfInterval({ start: dateRange.from, end: to });
   }, [dateRange]);
+  
+  const allTasksForSchedule = React.useMemo(() => {
+     if (!generatedSchedule) return [];
+     const allScheduledTasks: (Task & { occurrenceDate?: Date, originalId?: string })[] = [];
+     Object.values(generatedSchedule).forEach(daySchedule => {
+       daySchedule.forEach(ts => {
+         ts.schedule.forEach(entry => {
+           const originalTask = tasks.find(t => entry.taskId.startsWith(t.id));
+           if(originalTask) {
+             const existing = allScheduledTasks.find(t => t.id === entry.taskId);
+             if (!existing) {
+                allScheduledTasks.push({ ...originalTask, id: entry.taskId });
+             }
+           }
+         });
+       });
+     });
+     return allScheduledTasks;
+  }, [generatedSchedule, tasks]);
+
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -828,7 +877,7 @@ export function Dashboard() {
                                       </div>
                                       <div className="relative h-12 w-full rounded-lg bg-secondary">
                                       {ts.schedule.map((entry, index) => {
-                                        const task = tasks.find(t => t.id === entry.taskId);
+                                        const task = allTasksForSchedule.find(t => t.id === entry.taskId);
                                         if (!task) return null;
 
                                         const start = new Date(entry.startTime);

@@ -15,6 +15,7 @@ export interface Task {
   segment?: string;
   startTime?: Date;
   endTime?: Date;
+  repeatInterval?: number;
 }
 
 export interface TargetScheduleInfo {
@@ -57,7 +58,5 @@ export interface TargetSchedule {
 export interface GeneratedSchedule {
   [date: string]: TargetSchedule[];
 }
-
-    
 
     
