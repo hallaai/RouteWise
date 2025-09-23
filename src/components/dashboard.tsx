@@ -686,7 +686,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
       {deletionTarget && (
          <AlertDialog open={!!deletionTarget} onOpenChange={() => setDeletionTarget(null)}>
-            <AlertDialogContent className="sm:max-w-xl">
+            <AlertDialogContent className="sm:max-w-2xl">
             <AlertDialogHeader>
                 <AlertDialogTitle>Clear scheduled tasks?</AlertDialogTitle>
                 <AlertDialogDescription>
