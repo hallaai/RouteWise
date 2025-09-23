@@ -337,25 +337,6 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
       task.type.toLowerCase().includes(filter.toLowerCase())
   );
   
-  const doesScheduleFit = (schedule: GeneratedSchedule) => {
-    let allFit = true;
-    for (const date in schedule) {
-      for (const targetSchedule of schedule[date]) {
-        const target = targets.find(t => t.id === targetSchedule.targetId);
-        if (!target || !target.schedules || target.schedules.length === 0) continue;
-        
-        const [startHour, startMinute] = target.schedules[0].dayStarts.split(':').map(Number);
-        const [endHour, endMinute] = target.schedules[0].dayEnds.split(':').map(Number);
-        const workingDayMinutes = (endHour - startHour) * 60 + (endMinute - startMinute);
-
-        if (targetSchedule.totalDuration + targetSchedule.totalTravelTime > workingDayMinutes) {
-          allFit = false;
-        }
-      }
-    }
-    return allFit;
-  }
-
   const handleGenerateSchedule = (extendDay = false, force = false) => {
     if (selectedTaskIds.size === 0 || selectedTargetIds.size === 0) {
       toast({
@@ -393,7 +374,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
             if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
                 let currentDate = task.startTime;
                 while (currentDate <= endDay) {
-                    if (currentDate >= today) {
+                    if (isWithinInterval(currentDate, { start: today, end: endDay })) {
                         allTaskOccurrences.push({ 
                             ...task, 
                             originalId: task.id, 
@@ -411,14 +392,11 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     occurrenceDate: task.startTime
                 });
             } else if (!task.startTime) {
-                // For tasks without a start time, assume they can be scheduled on any day in the range
-                datesToSchedule.forEach(currentDate => {
-                    allTaskOccurrences.push({
-                         ...task, 
-                        originalId: task.id, 
-                        id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
-                        occurrenceDate: currentDate 
-                    })
+                 allTaskOccurrences.push({ 
+                    ...task, 
+                    originalId: task.id, 
+                    id: `${task.id}-adhoc`, 
+                    occurrenceDate: today // schedule for first day if no time specified
                 });
             }
         });
@@ -497,9 +475,18 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
             });
         });
         
-      const allScheduledIds = new Set(Object.values(schedule).flat().flatMap(ts => ts.schedule.map(e => e.taskId.split('-202')[0])));
+      const allScheduledTaskIds = new Set<string>();
+      Object.values(schedule).flat().forEach(ts => {
+        ts.schedule.forEach(entry => {
+            const originalId = allTaskOccurrences.find(t => t.id === entry.taskId)?.originalId;
+            if (originalId) {
+                allScheduledTaskIds.add(originalId);
+            }
+        });
+      });
+
       const allSelectedOriginalIds = new Set(originalTasksToSchedule.map(t => t.id));
-      const hasUnscheduledTasks = ![...allSelectedOriginalIds].every(id => allScheduledIds.has(id));
+      const hasUnscheduledTasks = ![...allSelectedOriginalIds].every(id => allScheduledTaskIds.has(id));
 
       if (!force && hasUnscheduledTasks) {
         setShowExtendDayDialog(true);
@@ -599,8 +586,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
           if (originalTask?.originalId) {
             ids.add(originalTask.originalId);
           } else {
-            // Fallback for tasks that might not be in allTasksForSchedule
-            const baseId = entry.taskId.split('-202')[0]; // Attempt to get original ID
+            const baseId = entry.taskId.split('-202')[0].replace('-adhoc','');
             ids.add(baseId);
           }
         });
@@ -613,7 +599,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
        <AlertDialog open={showExtendDayDialog} onOpenChange={setShowExtendDayDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Tasks don't fit in the working day</AlertDialogTitle>
             <AlertDialogDescription>
@@ -1074,5 +1060,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
+
+    
 
     
