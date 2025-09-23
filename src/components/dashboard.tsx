@@ -119,7 +119,7 @@ export function Dashboard() {
     Set<string>
   >(new Set());
   const [workingDayHours, setWorkingDayHours] = React.useState([8]);
-  const [vehicleSpeed, setVehicleSpeed] = React.useState([70]);
+  const [vehicleSpeed, setVehicleSpeed] = React.useState(70);
   const [includeHomeTravel, setIncludeHomeTravel] = React.useState({
     start: true,
     end: true,
@@ -636,15 +636,15 @@ export function Dashboard() {
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="vehicle-speed">
-                      Vehicle Speed: {vehicleSpeed[0]} km/h
+                      Vehicle Speed (km/h)
                     </Label>
-                    <Slider
+                    <Input
                       id="vehicle-speed"
-                      min={20}
-                      max={120}
-                      step={5}
+                      type="number"
                       value={vehicleSpeed}
-                      onValueChange={setVehicleSpeed}
+                      onChange={(e) => setVehicleSpeed(Math.min(999, Number(e.target.value)))}
+                      max={999}
+                      className="max-w-[150px]"
                     />
                   </div>
                   <div className="flex items-center space-x-4">
@@ -853,7 +853,3 @@ export function Dashboard() {
     </div>
   );
 }
-
-    
-
-    
