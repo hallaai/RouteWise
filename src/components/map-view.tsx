@@ -2,14 +2,22 @@
 "use client";
 
 import * as React from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import { Icon, LatLngBounds, divIcon } from "leaflet";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Task } from "@/lib/types";
+import type { Task } from "@/lib/types";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
-import { renderToStaticMarkup } from "react-dom/server";
-import { Circle } from "lucide-react";
+
+// Leaflet and plugins
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster';
+
+// Import marker images from node_modules
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import iconUrl from 'leaflet/dist/images/marker-icon.png';
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
 
 interface MapViewProps {
   tasks: Task[];
@@ -19,37 +27,16 @@ interface MapViewProps {
 
 type FilterType = "all" | "scheduled" | "unscheduled";
 
-// Custom hook to update map view when tasks change
-const MapUpdater = ({ tasks }: { tasks: Task[] }) => {
-  const map = useMap();
-  React.useEffect(() => {
-    if (tasks.length > 0) {
-      const bounds = new LatLngBounds(tasks.map(task => [task.location.lat, task.location.lng]));
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }
-  }, [tasks, map]);
-  return null;
-};
-
-
 export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewProps) {
   const [filter, setFilter] = React.useState<FilterType>("all");
-  
-  // Handle client-side only rendering
-  const [isClient, setIsClient] = React.useState(false);
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
+  const mapContainerRef = React.useRef<HTMLDivElement>(null);
+  const mapRef = React.useRef<L.Map | null>(null);
+  const markersRef = React.useRef<L.MarkerClusterGroup | null>(null);
 
   const filteredTasks = React.useMemo(() => {
     switch (filter) {
       case "scheduled":
-        return tasks.filter(task => {
-          // A task is considered scheduled if any of its occurrences are in the schedule
-          return scheduledTaskIds.has(task.id);
-        });
+        return tasks.filter(task => scheduledTaskIds.has(task.id));
       case "unscheduled":
         return tasks.filter(task => !scheduledTaskIds.has(task.id));
       case "all":
@@ -58,41 +45,96 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
     }
   }, [tasks, scheduledTaskIds, filter]);
   
-  const createMarkerIcon = (isHighlighted: boolean) => {
-    const iconMarkup = renderToStaticMarkup(
-       <Circle 
-          className={isHighlighted ? 'text-accent' : 'text-primary'}
-          fill={isHighlighted ? 'hsl(var(--accent))' : 'hsl(var(--primary))'}
-          strokeWidth={1}
-          stroke="white"
-          size={isHighlighted ? 18 : 12}
-       />
-    );
-    return divIcon({
-      html: iconMarkup,
-      className: 'bg-transparent border-0',
-      iconSize: [isHighlighted ? 18 : 12, isHighlighted ? 18 : 12],
-      iconAnchor: [isHighlighted ? 9 : 6, isHighlighted ? 9 : 6],
+  React.useEffect(() => {
+    // This code runs only on the client.
+    // Set up Leaflet icon paths
+    // @ts-ignore
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: iconRetinaUrl.src,
+        iconUrl: iconUrl.src,
+        shadowUrl: shadowUrl.src
     });
-  }
 
-  if (!isClient) {
-    return (
-       <Card>
-        <CardHeader>
-          <CardTitle>Route Map</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full h-[60vh] bg-secondary rounded-lg flex items-center justify-center">
-            <p>Loading Map...</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+    // Initialize map
+    if (mapContainerRef.current && !mapRef.current) {
+        mapRef.current = L.map(mapContainerRef.current).setView([61.498, 23.76], 10); // Default view
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(mapRef.current);
+    }
+    
+    // Handle markers
+    if (mapRef.current) {
+        // Initialize or clear marker cluster group
+        if (markersRef.current) {
+            markersRef.current.clearLayers();
+        } else {
+            markersRef.current = L.markerClusterGroup();
+            mapRef.current.addLayer(markersRef.current);
+        }
+
+        const validTasks = filteredTasks.filter(task => 
+            task.location && 
+            typeof task.location.lat === 'number' && 
+            typeof task.location.lng === 'number'
+        );
+
+        if (validTasks.length > 0) {
+            const bounds = L.latLngBounds(validTasks.map(task => [task.location.lat, task.location.lng]));
+            
+            validTasks.forEach(task => {
+                const isHighlighted = activeTaskGroups.has(task.id);
+                
+                const customIcon = new L.Icon({
+                    iconUrl: iconUrl.src,
+                    iconRetinaUrl: iconRetinaUrl.src,
+                    shadowUrl: shadowUrl.src,
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41],
+                    className: isHighlighted ? 'leaflet-marker-highlighted' : ''
+                });
+
+
+                const marker = L.marker([task.location.lat, task.location.lng], { icon: customIcon });
+                
+                const popupContent = `
+                  <div style="font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6;">
+                    <b style="font-size: 16px; font-weight: 600;">${task.name}</b><br>
+                    <strong>Type:</strong> <span style="text-transform: capitalize;">${task.type}</span><br>
+                    <strong>Duration:</strong> ${task.duration} min<br>
+                    <strong>Address:</strong> ${task.location.address}<br>
+                    ${task.segment ? `<strong>Segment:</strong> ${task.segment}<br>` : ''}
+                  </div>
+                `;
+                marker.bindPopup(popupContent);
+
+                if(markersRef.current) {
+                    markersRef.current.addLayer(marker);
+                }
+            });
+
+            if (mapRef.current && bounds.isValid()) {
+                mapRef.current.fitBounds(bounds.pad(0.1));
+            }
+        }
+    }
+
+  }, [filteredTasks, activeTaskGroups]);
+
 
   return (
     <Card>
+      <style>
+        {`
+          .leaflet-marker-highlighted {
+            filter: hue-rotate(170deg) brightness(1.2) saturate(2);
+          }
+        `}
+      </style>
       <CardHeader className="flex flex-row justify-between items-center">
         <CardTitle>Route Map</CardTitle>
          <RadioGroup value={filter} onValueChange={(value: FilterType) => setFilter(value)} className="flex items-center space-x-4">
@@ -111,32 +153,8 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
           </RadioGroup>
       </CardHeader>
       <CardContent>
-        <div className="w-full h-[60vh] bg-secondary rounded-lg">
-           <MapContainer center={[61.498, 23.76]} zoom={10} style={{ height: "100%", width: "100%" }}>
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {filteredTasks.map(task => {
-                const isHighlighted = activeTaskGroups.has(task.id);
-                return (
-                  <Marker 
-                    key={task.id} 
-                    position={[task.location.lat, task.location.lng]}
-                    icon={createMarkerIcon(isHighlighted)}
-                  >
-                    <Popup>
-                      <b>{task.name}</b><br />{task.location.address}
-                    </Popup>
-                  </Marker>
-                )
-            })}
-             <MapUpdater tasks={filteredTasks} />
-          </MapContainer>
-        </div>
+        <div ref={mapContainerRef} className="w-full h-[60vh] bg-secondary rounded-lg" />
       </CardContent>
     </Card>
   );
 }
-
-    
