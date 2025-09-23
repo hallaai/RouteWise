@@ -318,7 +318,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     return true;
   }
 
-  const handleGenerateSchedule = (extendDay = false) => {
+  const handleGenerateSchedule = (extendDay = false, force = false) => {
     if (selectedTaskIds.size === 0 || selectedTargetIds.size === 0) {
       toast({
         title: "Selection required",
@@ -349,32 +349,31 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
         const endDay = dateRange?.to || addDays(today, 6);
         const datesToSchedule = eachDayOfInterval({ start: today, end: endDay });
         
-        const allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
+        let allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
         
         originalTasksToSchedule.forEach(task => {
-            if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
-                let currentDate = task.startTime;
-                 while (currentDate <= endDay) {
-                    if (isWithinInterval(currentDate, { start: today, end: endDay })) {
-                         allTaskOccurrences.push({ 
-                            ...task, 
-                            originalId: task.id, 
-                            id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
-                            occurrenceDate: currentDate 
-                        });
-                    }
-                    currentDate = addDays(currentDate, task.repeatInterval);
-                }
-            } else if (task.startTime) {
-                if (isWithinInterval(task.startTime, { start: today, end: endDay })) {
-                     allTaskOccurrences.push({ 
-                        ...task, 
-                        originalId: task.id,
-                        id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`,
-                        occurrenceDate: task.startTime
-                    });
-                }
-            }
+          if (task.startTime && isWithinInterval(task.startTime, { start: today, end: endDay })) {
+            allTaskOccurrences.push({ 
+                ...task, 
+                originalId: task.id, 
+                id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, 
+                occurrenceDate: task.startTime
+            });
+          }
+          if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
+              let currentDate = addDays(task.startTime, task.repeatInterval);
+               while (currentDate <= endDay) {
+                  if (isWithinInterval(currentDate, { start: today, end: endDay })) {
+                       allTaskOccurrences.push({ 
+                          ...task, 
+                          originalId: task.id, 
+                          id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
+                          occurrenceDate: currentDate 
+                      });
+                  }
+                  currentDate = addDays(currentDate, task.repeatInterval);
+              }
+          }
         });
 
 
@@ -394,7 +393,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 
                 const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
                 const endOfDay = setSeconds(setMinutes(setHours(currentDate, endHour), endMinute), 0);
-                const dayEndWithExtension = addMinutes(endOfDay, workingDayHours * 60)
+                const dayEndWithExtension = extendDay ? addMinutes(endOfDay, workingDayHours * 60) : endOfDay;
 
                 const scheduledEntries: ScheduleEntry[] = [];
                 let totalDuration = 0;
@@ -446,7 +445,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
             });
         });
 
-      if (!extendDay && !doesScheduleFit(schedule)) {
+      if (!force && !doesScheduleFit(schedule)) {
         setShowExtendDayDialog(true);
         setIsLoading(false);
         return;
@@ -560,13 +559,16 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Tasks don't fit in the working day</AlertDialogTitle>
             <AlertDialogDescription>
-              Some tasks cannot be completed within the current working day. Would you like to extend the working day to fit all tasks? The required extension is calculated automatically.
+              Some tasks cannot be completed within the current working day. You can extend the day to fit all tasks, or schedule only the tasks that fit.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleGenerateSchedule(true)}>
-              Extend Working Day
+             <Button variant="outline" onClick={() => handleGenerateSchedule(false, true)}>
+              Schedule Without Extending
+            </Button>
+            <AlertDialogAction onClick={() => handleGenerateSchedule(true, true)}>
+              Extend and Reschedule
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -739,8 +741,11 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredTasks.map((task) => (
-                        <TableRow key={task.id}>
+                      {filteredTasks.map((task) => {
+                        const isScheduled = generatedSchedule && scheduledTaskIds.has(task.id);
+                        const isUnscheduled = generatedSchedule && !scheduledTaskIds.has(task.id);
+                        return(
+                        <TableRow key={task.id} className={cn(isUnscheduled && "line-through opacity-50")}>
                           <TableCell>
                             <Checkbox
                               checked={selectedTaskIds.has(task.id)}
@@ -768,7 +773,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                             {task.duration}
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )})}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -973,3 +978,5 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
+
+    
