@@ -1,0 +1,1017 @@
+{
+  "resetData": true,
+  "capacities": [
+    {
+      "description": "1"
+    }
+  ],
+  "locations": [
+    {
+      "referenceId": "Unit_1",
+      "parentReferenceId": null,
+      "name": "Helsinki",
+      "address": {
+        "street": "Pasilanraitio",
+        "city": "Helsinki"
+      },
+      "coordinates": {
+        "lat": 60.1987,
+        "lon": 24.9254
+      }
+    }
+  ],
+  "targets": [
+    {
+      "referenceId": "target-1-1",
+      "locationReferenceId": "Unit_1",
+      "name": "Olli Jussila",
+      "deleted": null,
+      "defaultCapacity": 1000,
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "coordinates": {
+        "lat": 60.1694,
+        "lon": 24.9501
+      },
+      "address": {
+        "name": "",
+        "street": "Fabianinkatu",
+        "postCode": "",
+        "city": "Helsinki",
+        "country": "Finland",
+        "phone": ""
+      },
+      "schedules": [
+        {
+          "dayStarts": "08:00",
+          "dayEnds": "16:00",
+          "validFrom": "2025-09-22T00:00:00.000Z",
+          "validTo": "2025-09-22T20:59:59.999Z"
+        }
+      ]
+    },
+    {
+      "referenceId": "target-1-2",
+      "locationReferenceId": "Unit_1",
+      "name": "Aino Korhonen",
+      "deleted": null,
+      "defaultCapacity": 1000,
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "coordinates": {
+        "lat": 60.1694,
+        "lon": 24.9501
+      },
+      "address": {
+        "name": "",
+        "street": "Fabianinkatu",
+        "postCode": "",
+        "city": "Helsinki",
+        "country": "Finland",
+        "phone": ""
+      },
+      "schedules": [
+        {
+          "dayStarts": "08:00",
+          "dayEnds": "16:00",
+          "validFrom": "2025-09-22T00:00:00.000Z",
+          "validTo": "2025-09-26T20:59:59.999Z"
+        }
+      ]
+    },
+    {
+      "referenceId": "target-1-3",
+      "locationReferenceId": "Unit_1",
+      "name": "Leena Tervo",
+      "deleted": null,
+      "defaultCapacity": 1000,
+      "skills": [
+      ],
+      "coordinates": {
+        "lat": 60.1694,
+        "lon": 24.9501
+      },
+      "address": {
+        "name": "",
+        "street": "Fabianinkatu",
+        "postCode": "",
+        "city": "Helsinki",
+        "country": "Finland",
+        "phone": ""
+      },
+      "schedules": [
+        {
+          "dayStarts": "08:00",
+          "dayEnds": "16:00",
+          "validFrom": "2025-09-22T00:00:00.000Z",
+          "validTo": "2025-09-26T20:59:59.999Z"
+        }
+      ]
+    },
+    {
+      "referenceId": "target-1-4",
+      "locationReferenceId": "Unit_1",
+      "name": "Sari Laine",
+      "deleted": null,
+      "defaultCapacity": 1000,
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "coordinates": {
+        "lat": 60.1694,
+        "lon": 24.9501
+      },
+      "address": {
+        "name": "",
+        "street": "Fabianinkatu",
+        "postCode": "",
+        "city": "Helsinki",
+        "country": "Finland",
+        "phone": ""
+      },
+      "schedules": [
+        {
+          "dayStarts": "11:00",
+          "dayEnds": "16:00",
+          "validFrom": "2025-09-22T00:00:00.000Z",
+          "validTo": "2025-09-26T20:59:59.999Z"
+        }
+      ]
+    },
+    {
+      "referenceId": "target-1-5",
+      "locationReferenceId": "Unit_1",
+      "name": "Minna Kauppinen",
+      "deleted": null,
+      "defaultCapacity": 1000,
+      "skills": [
+      ],
+      "coordinates": {
+        "lat": 60.1694,
+        "lon": 24.9501
+      },
+      "address": {
+        "name": "",
+        "street": "Fabianinkatu",
+        "postCode": "",
+        "city": "Helsinki",
+        "country": "Finland",
+        "phone": ""
+      },
+      "schedules": [
+        {
+          "dayStarts": "11:00",
+          "dayEnds": "16:00",
+          "validFrom": "2025-09-22T00:00:00.000Z",
+          "validTo": "2025-09-26T20:59:59.999Z"
+        }
+      ]
+    }
+  ],
+  "works": [
+    {
+      "load": 161,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "0c54999d-977c-4834-a58f-343d6bb8d614",
+      "workNumber": "1",
+      "name": "Talviurheiluvälineet Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Iso Roobertinkatu",
+        "street": "Iso Roobertinkatu",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1635,
+        "lon": 24.942
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 99,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "4d6c628a-624f-48a4-ab2a-f47f6351cbae",
+      "workNumber": "2",
+      "name": "Suomalainen Terveysteknologia Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Eteläesplanadi",
+        "street": "Eteläesplanadi",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1672,
+        "lon": 24.9496
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 137,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "cb6cc8af-9f6b-4d6a-b761-5512007b5a87",
+      "workNumber": "3",
+      "name": "Oulun Teknologiapuisto Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Pursimiehenkatu",
+        "street": "Pursimiehenkatu",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1606,
+        "lon": 24.9414
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 95,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "5a1b4966-40e9-47f7-9444-f0409a4c6af0",
+      "workNumber": "4",
+      "name": "Suomalaiset Lääkintälaitteet Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Länsiväylä 2",
+        "street": "Länsiväylä 2",
+        "city": "Espoo",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1835,
+        "lon": 24.7943
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 133,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "fb33732d-9670-4690-905c-af1d2078b31e",
+      "workNumber": "5",
+      "name": "Helsingin Koulutusteknologia Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Taavinkyläntie",
+        "street": "Taavinkyläntie",
+        "city": "Espoo",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.205,
+        "lon": 24.656
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 138,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "382d85cd-662a-4152-af74-0b1f149c4226",
+      "workNumber": "6",
+      "name": "Järvimaan Ruokatuotteet Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Martinkyläntie",
+        "street": "Martinkyläntie",
+        "city": "Espoo",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1557,
+        "lon": 24.745
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 150,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "92c5cd78-0698-4abf-987a-af993a32e360",
+      "workNumber": "7",
+      "name": "Tampereen Konepaja Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Tikkuraitti 5",
+        "street": "Tikkuraitti 5",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.299,
+        "lon": 24.9741
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 65,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "e3fcf890-f89d-4fd9-8763-33e5d93ae060",
+      "workNumber": "8",
+      "name": "Helsingin Sataman Tuonti Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Hakintie 5",
+        "street": "Hakintie 5",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.2962181,
+        "lon": 25.0791133
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 175,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "e1575374-0bf1-468d-a442-d51ad98feb7c",
+      "workNumber": "9",
+      "name": "Helsingin Digitaalipalvelut Oy",
+      "segment": "Toimiston siivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Mestarintie 4",
+        "street": "Mestarintie 4",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.3063,
+        "lon": 24.8489
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 1,
+      "timeShift": 600
+    },
+    {
+      "load": 169,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "487d38c6-9105-4e93-83fb-e88e60606915",
+      "workNumber": "10",
+      "name": "Suomalaiset Jääkiekkovarusteet Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Annankatu",
+        "street": "Annankatu",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1679,
+        "lon": 24.9354
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 151,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "6aa03d58-ab20-4520-ba7c-f6a2814870ae",
+      "workNumber": "11",
+      "name": "Pohjoismainen Kalustesuunnittelu Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-23T05:00:00.000Z",
+      "endTime": "2025-09-23T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Sepänkatu 1",
+        "street": "Sepänkatu 1",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1599,
+        "lon": 24.9415
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 239,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "7f7cd778-c82d-4310-be0c-f2004550b2ff",
+      "workNumber": "12",
+      "name": "Pohjoisen Rakennusratkaisut Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-24T05:00:00.000Z",
+      "endTime": "2025-09-24T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Senaatintori",
+        "street": "Senaatintori",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1695,
+        "lon": 24.9523
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 120,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "1d1a9ddc-63e2-4091-84ee-f6c7ef126147",
+      "workNumber": "13",
+      "name": "Suomen Metsänhoito Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-25T05:00:00.000Z",
+      "endTime": "2025-09-25T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Uudenmaankatu",
+        "street": "Uudenmaankatu",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1655,
+        "lon": 24.9438
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 175,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "a7c8500c-56a4-4ac3-aeb7-98ee177273ca",
+      "workNumber": "14",
+      "name": "Talviurheiluvälineet Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-26T05:00:00.000Z",
+      "endTime": "2025-09-26T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Niittymaantie 1",
+        "street": "Niittymaantie 1",
+        "city": "Espoo",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1701,
+        "lon": 24.7754
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 163,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "4ff34b3a-4cba-4867-a473-2045d4c4685a",
+      "workNumber": "15",
+      "name": "Lapin Elämys Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-22T05:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Vanhamaantie 2",
+        "street": "Vanhamaantie 2",
+        "city": "Espoo",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.2061,
+        "lon": 24.6538
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 138,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "8b8462ba-c98e-44c2-a823-9396baa9bd5b",
+      "workNumber": "16",
+      "name": "Helsingin Kuljetus Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-23T05:00:00.000Z",
+      "endTime": "2025-09-23T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Vantaanportti",
+        "street": "Vantaanportti",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.293,
+        "lon": 24.9618
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 157,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "898f8f74-9fdf-4770-9bcc-0049d7a9fdca",
+      "workNumber": "17",
+      "name": "Arktinen Tutkimuslaitos Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-24T05:00:00.000Z",
+      "endTime": "2025-09-24T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Karhunkierros 4",
+        "street": "Karhunkierros 4",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.2603,
+        "lon": 24.8109
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 155,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "c0adce63-634c-450e-b50d-8c2fc6caeacc",
+      "workNumber": "18",
+      "name": "Suomen Mittausteknologia Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-25T05:00:00.000Z",
+      "endTime": "2025-09-25T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Kaskelantie 4",
+        "street": "Kaskelantie 4",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.3028,
+        "lon": 25.0011
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 142,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "7f6fd381-76ca-44ca-8027-b1a0d78a3ea3",
+      "workNumber": "19",
+      "name": "Tampereen Tekstiiliteollisuus Oy",
+      "segment": "Kotisiivous",
+      "type": null,
+      "startTime": "2025-09-26T05:00:00.000Z",
+      "endTime": "2025-09-26T16:00:00.000Z",
+      "skills": [],
+      "address": {
+        "name": "Tuovintie 39",
+        "street": "Tuovintie 39",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.327633,
+        "lon": 25.096944
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "86180b28-5123-4a67-a563-59ede70d503f",
+      "workNumber": "20",
+      "name": "Asfalttipinnan päällystys",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-22T10:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Ruoholahdenkatu",
+        "street": "Ruoholahdenkatu",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1653,
+        "lon": 24.9263
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "3853c291-8799-4788-aafb-0ef7f18a6c44",
+      "workNumber": "21",
+      "name": "Hotellin vedenpaineen tarkastus",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-23T10:00:00.000Z",
+      "endTime": "2025-09-23T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Fleminginkatu 2",
+        "street": "Fleminginkatu 2",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1845,
+        "lon": 24.9528
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "4d8001c2-a4c1-4f24-b678-0a40a1a7cf7b",
+      "workNumber": "22",
+      "name": "Ulkoverhoilun korjaus",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-24T10:00:00.000Z",
+      "endTime": "2025-09-24T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Lars Sonckin tie 1",
+        "street": "Lars Sonckin tie 1",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1831,
+        "lon": 25.0131
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "d3957b0f-2120-436f-aaab-2d204e096902",
+      "workNumber": "23",
+      "name": "Kylpyhuoneen laattojen korjaus",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-25T10:00:00.000Z",
+      "endTime": "2025-09-25T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Kolmas linja",
+        "street": "Kolmas linja",
+        "city": "Helsinki",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1853,
+        "lon": 24.9419
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "a9cabb23-8839-420d-a4fa-99e05af3c522",
+      "workNumber": "24",
+      "name": "Kylpyammeen saumaus",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-26T10:00:00.000Z",
+      "endTime": "2025-09-26T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Kehä I",
+        "street": "Kehä I",
+        "city": "Espoo",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.238,
+        "lon": 24.6942
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "2fe0f9ae-265d-4a61-84a8-da9ef1c1a953",
+      "workNumber": "25",
+      "name": "Autokatoksen korjaus",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-22T10:00:00.000Z",
+      "endTime": "2025-09-22T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Merikansantie 1",
+        "street": "Merikansantie 1",
+        "city": "Espoo",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.1492,
+        "lon": 24.6594
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "7ecbc007-2108-4d5b-afd0-b8a782973416",
+      "workNumber": "26",
+      "name": "Kipsilevyn asennus",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-23T10:00:00.000Z",
+      "endTime": "2025-09-23T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Kiitoradantie",
+        "street": "Kiitoradantie",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.2957,
+        "lon": 24.9839
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "db589a5e-775c-4240-8a74-2e9770997869",
+      "workNumber": "27",
+      "name": "Ilmastointilaitteen huolto",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-24T10:00:00.000Z",
+      "endTime": "2025-09-24T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Martinlaaksontie 1",
+        "street": "Martinlaaksontie 1",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.278,
+        "lon": 24.8663
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "c0a74cc1-c56c-452f-b727-dd7335253ad0",
+      "workNumber": "28",
+      "name": "Takan kaasumuunnos",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-25T10:00:00.000Z",
+      "endTime": "2025-09-25T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Ilmakehä",
+        "street": "Ilmakehä",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.3061,
+        "lon": 24.9716
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    },
+    {
+      "load": 180,
+      "locationReferenceId": "Unit_1",
+      "referenceId": "fd7dd074-83d9-4a02-b315-1c7cf58ae9cc",
+      "workNumber": "29",
+      "name": "Palovaroittimen testaus",
+      "segment": "Lounasravintolan",
+      "type": "Maintenance",
+      "startTime": "2025-09-26T10:00:00.000Z",
+      "endTime": "2025-09-26T16:00:00.000Z",
+      "skills": [
+        {
+          "name": "hygieniapassi",
+          "level": 0
+        }
+      ],
+      "address": {
+        "name": "Vantaanportti 1",
+        "street": "Vantaanportti 1",
+        "city": "Vantaa",
+        "country": "Finland"
+      },
+      "coordinates": {
+        "lat": 60.293,
+        "lon": 24.9618
+      },
+      "info": "no",
+      "repeatMode": "0",
+      "repeatFrequency": 0,
+      "repeatInterval": 7,
+      "timeShift": 600
+    }
+  ]
+}
