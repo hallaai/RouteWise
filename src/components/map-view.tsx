@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import type { Task } from "@/lib/types";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { Label } from "./ui/label";
+import { cn } from "@/lib/utils";
 
 // Leaflet and plugins
 import L from 'leaflet';
@@ -36,9 +37,15 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
   const filteredTasks = React.useMemo(() => {
     switch (filter) {
       case "scheduled":
-        return tasks.filter(task => scheduledTaskIds.has(task.id));
+        return tasks.filter(task => {
+            const baseId = task.id.split('-202')[0].replace('-adhoc','');
+            return scheduledTaskIds.has(baseId) || scheduledTaskIds.has(task.id);
+        });
       case "unscheduled":
-        return tasks.filter(task => !scheduledTaskIds.has(task.id) && scheduledTaskIds.size > 0);
+        return tasks.filter(task => {
+             const baseId = task.id.split('-202')[0].replace('-adhoc','');
+            return !scheduledTaskIds.has(baseId) && !scheduledTaskIds.has(task.id) && scheduledTaskIds.size > 0
+        });
       case "all":
       default:
         return tasks;
@@ -87,7 +94,8 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
             const bounds = L.latLngBounds(validTasks.map(task => [task.location.lat, task.location.lng]));
             
             validTasks.forEach(task => {
-                const isHighlighted = activeTaskGroups.has(task.id);
+                const originalId = task.originalId || task.id;
+                const isHighlighted = activeTaskGroups.has(originalId);
                 
                 const customIcon = new L.Icon({
                     iconUrl: iconUrl.src,
@@ -155,5 +163,3 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
     </Card>
   );
 }
-
-    
