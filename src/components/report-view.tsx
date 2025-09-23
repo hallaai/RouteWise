@@ -17,6 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
+import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import type { GeneratedSchedule, Task, Target, AppState } from "@/lib/types";
 import { format, parseISO } from "date-fns";
@@ -43,6 +51,13 @@ const formatMinutes = (minutes: number) => {
     const mins = Math.round(minutes % 60);
     return `${hours}h ${mins}m`;
 }
+
+const CHART_COLORS = {
+  taskTime: "hsl(var(--chart-1))",
+  travelTime: "hsl(var(--chart-2))",
+  idleTime: "hsl(var(--chart-4))",
+};
+
 
 export function ReportView({ schedule, tasks, targets, appState, displayedDates }: ReportViewProps) {
   const metrics = React.useMemo(() => {
@@ -130,6 +145,33 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
     };
   }, [schedule, tasks, targets, appState.vehicleSpeed, displayedDates]);
 
+  const chartData = React.useMemo(() => {
+    if (!metrics.total) return [];
+    return [
+      { name: 'Task Time', value: metrics.total.taskTime, fill: CHART_COLORS.taskTime },
+      { name: 'Travel Time', value: metrics.total.travelTime, fill: CHART_COLORS.travelTime },
+      { name: 'Idle Time', value: metrics.total.idleTime, fill: CHART_COLORS.idleTime },
+    ].filter(item => item.value > 0);
+  }, [metrics.total]);
+
+  const chartConfig = {
+      value: {
+        label: "Minutes",
+      },
+      taskTime: {
+        label: "Task Time",
+        color: "hsl(var(--chart-1))",
+      },
+      travelTime: {
+        label: "Travel Time",
+        color: "hsl(var(--chart-2))",
+      },
+      idleTime: {
+        label: "Idle Time",
+        color: "hsl(var(--chart-4))",
+      },
+  }
+
   if (!metrics.total || metrics.total.taskCount === 0) {
     return (
       <Card>
@@ -144,6 +186,9 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
     );
   }
 
+  const totalTimeForChart = chartData.reduce((acc, curr) => acc + curr.value, 0);
+
+
   return (
     <div className="space-y-6">
       <Card>
@@ -154,27 +199,80 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
           </CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
-                <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">Tasks</p>
-                    <p className="text-2xl font-bold">{metrics.total.taskCount}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+                    <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Tasks</p>
+                        <p className="text-2xl font-bold">{metrics.total.taskCount}</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Distance</p>
+                        <p className="text-2xl font-bold">{metrics.total.totalDistance.toFixed(1)} km</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg col-span-2 md:col-span-1">
+                        <p className="text-sm text-muted-foreground">Total Work</p>
+                        <p className="text-2xl font-bold">{formatMinutes(metrics.total.taskTime + metrics.total.travelTime)}</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Task Time</p>
+                        <p className="text-2xl font-bold">{formatMinutes(metrics.total.taskTime)}</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Travel Time</p>
+                        <p className="text-2xl font-bold">{formatMinutes(metrics.total.travelTime)}</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg">
+                        <p className="text-sm text-muted-foreground">Idle Time</p>
+                        <p className="text-2xl font-bold">{formatMinutes(metrics.total.idleTime)}</p>
+                    </div>
                 </div>
-                 <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">Distance</p>
-                    <p className="text-2xl font-bold">{metrics.total.totalDistance.toFixed(1)} km</p>
-                </div>
-                 <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">Task Time</p>
-                    <p className="text-2xl font-bold">{formatMinutes(metrics.total.taskTime)}</p>
-                </div>
-                 <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">Travel Time</p>
-                    <p className="text-2xl font-bold">{formatMinutes(metrics.total.travelTime)}</p>
-                </div>
-                 <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm text-muted-foreground">Idle Time</p>
-                    <p className="text-2xl font-bold">{formatMinutes(metrics.total.idleTime)}</p>
-                </div>
+
+                {chartData.length > 0 && (
+                 <div className="flex flex-col items-center justify-center">
+                    <ChartContainer config={chartConfig} className="mx-auto aspect-square h-[250px]">
+                      <PieChart>
+                         <Tooltip
+                            formatter={(value, name) => {
+                                const percentage = totalTimeForChart > 0 ? ((Number(value) / totalTimeForChart) * 100).toFixed(1) : 0;
+                                return `${formatMinutes(Number(value))} (${percentage}%)`;
+                            }}
+                         />
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          labelLine={false}
+                          label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                            const RADIAN = Math.PI / 180;
+                            const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                            const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                            const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                            return (
+                              <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+                                {`${(percent * 100).toFixed(0)}%`}
+                              </text>
+                            );
+                          }}
+                        >
+                           {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                         <ChartLegend
+                          content={<ChartLegendContent nameKey="name" />}
+                          className="-translate-y-2 flex-wrap gap-2"
+                          align="center"
+                          verticalAlign="bottom"
+                          wrapperStyle={{ bottom: 0, left: 0, right: 0, position: 'absolute' }}
+                        />
+                      </PieChart>
+                    </ChartContainer>
+                  </div>
+                )}
             </div>
         </CardContent>
       </Card>
@@ -218,3 +316,4 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
     </div>
   );
 }
+
