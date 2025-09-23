@@ -80,6 +80,19 @@ const taskTypeIcons: Record<TaskType, JSX.Element> = {
   cleaning: <Wrench className="h-4 w-4" />, // Example, choose a better icon if available
 };
 
+// Function to generate a color from a string
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let color = '#';
+  for (let i = 0; i < 3; i++) {
+    const value = (hash >> (i * 8)) & 0xFF;
+    color += ('00' + value.toString(16)).substr(-2);
+  }
+  return color;
+};
 
 const getTaskType = (work: any): TaskType => {
   if (work.segment?.toLowerCase().includes('siivous')) {
@@ -94,14 +107,14 @@ const getTaskType = (work: any): TaskType => {
 
 export function Dashboard() {
   const { toast } = useToast();
-  const [tasks, setTasks] = React.useState<Task[]>(mockTasks);
-  const [targets, setTargets] = React.useState<Target[]>(mockTargets);
+  const [tasks, setTasks] = React.useState<Task[]>([]);
+  const [targets, setTargets] = React.useState<Target[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = React.useState<Set<string>>(
     new Set()
   );
   const [selectedTargetIds, setSelectedTargetIds] = React.useState<
     Set<string>
-  >(new Set(mockTargets.map((t) => t.id)));
+  >(new Set());
   const [workingDayHours, setWorkingDayHours] = React.useState([8]);
   const [includeHomeTravel, setIncludeHomeTravel] = React.useState({
     start: true,
@@ -141,6 +154,7 @@ export function Dashboard() {
               duration: work.load || 60, // Default duration if not provided
               type: getTaskType(work),
               priority: 'medium', // Default priority
+              segment: work.segment,
               startTime: work.startTime ? parseISO(work.startTime) : undefined,
               endTime: work.endTime ? parseISO(work.endTime) : undefined,
             }));
@@ -158,7 +172,7 @@ export function Dashboard() {
             
             setTasks(newTasks);
             setTargets(newTargets);
-            setSelectedTaskIds(new Set());
+            setSelectedTaskIds(new Set(newTasks.map(t => t.id)));
             setSelectedTargetIds(new Set(newTargets.map(t => t.id)));
 
             toast({
@@ -505,6 +519,7 @@ export function Dashboard() {
                         <TableHead className="w-[40px]">
                           <Checkbox
                             checked={
+                              selectedTaskIds.size > 0 &&
                               selectedTaskIds.size === filteredTasks.length &&
                               filteredTasks.length > 0
                             }
@@ -750,16 +765,19 @@ export function Dashboard() {
 
                                           const left = (startOffsetMinutes / workingDayMinutes) * 100;
                                           const width = (durationMinutes / workingDayMinutes) * 100;
+                                          const segmentColor = task.segment ? stringToColor(task.segment) : '#29ABE2';
+
 
                                           return (
                                             <TooltipProvider key={entry.taskId}>
                                               <Tooltip>
                                                 <TooltipTrigger asChild>
                                                   <div
-                                                    className="absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md bg-primary/80 hover:bg-primary transition-all"
+                                                    className="absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md hover:opacity-90 transition-all"
                                                     style={{
                                                       left: `${left}%`,
                                                       width: `${width}%`,
+                                                      backgroundColor: segmentColor,
                                                     }}
                                                   >
                                                     <span className="truncate">{task.name}</span>
@@ -767,7 +785,7 @@ export function Dashboard() {
                                                 </TooltipTrigger>
                                                 <TooltipContent>
                                                   <p className="font-semibold">{task.name}</p>
-                                                  <p>{task.location.address}</p>
+                                                  {task.segment && <p>Segment: {task.segment}</p>}
                                                   <p>
                                                     {format(start, 'p')} - {format(end, 'p')}
                                                   </p>

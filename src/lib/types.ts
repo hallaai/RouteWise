@@ -12,6 +12,7 @@ export interface Task {
   duration: number; // in minutes
   type: TaskType;
   priority: 'low' | 'medium' | 'high';
+  segment?: string;
   startTime?: Date;
   endTime?: Date;
 }
