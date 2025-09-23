@@ -332,24 +332,27 @@ export function Dashboard() {
         const allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
         originalTasksToSchedule.forEach(task => {
           if (task.startTime) {
+            let currentDate = task.startTime;
+            // If the task repeats, find all occurrences in the date range
             if (task.repeatInterval && task.repeatInterval > 0) {
-              let currentDate = task.startTime;
               while (currentDate <= endDay) {
                 if (isWithinInterval(currentDate, { start: today, end: endDay })) {
                   allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, occurrenceDate: currentDate });
                 }
                 currentDate = addDays(currentDate, task.repeatInterval);
               }
-            } else {
+            } else { // If it doesn't repeat, just add it if it's in the range
                if (isWithinInterval(task.startTime, { start: today, end: endDay })) {
                  allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, occurrenceDate: task.startTime });
                }
             }
           } else {
-             // For tasks without a start time, maybe schedule them once? Or handle as per requirements.
-             // For now, let's assume they can be scheduled on any day.
-             // This part might need more clarification on business logic.
-             allTaskOccurrences.push({ ...task, originalId: task.id, occurrenceDate: today });
+             // For tasks without a start time, let's assume they can be scheduled on any day within the range.
+             // This might need more refined logic based on requirements.
+             // For now, creating one occurrence for each day in the range for simplicity.
+             datesToSchedule.forEach(day => {
+               allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(day, 'yyyy-MM-dd')}`, occurrenceDate: day });
+             });
           }
         });
 
@@ -963,5 +966,7 @@ export function Dashboard() {
     </div>
   );
 }
+
+    
 
     
