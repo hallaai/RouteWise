@@ -1,4 +1,5 @@
 
+
 export type TaskType = 'pickup' | 'delivery' | 'maintenance' | 'installation' | 'cleaning';
 
 export interface Task {
@@ -60,6 +61,11 @@ export interface GeneratedSchedule {
   [date: string]: TargetSchedule[];
 }
 
-    
-
-    
+export interface AppState {
+  workingDayHours: number;
+  vehicleSpeed: number;
+  includeHomeTravel: {
+    start: boolean;
+    end: boolean;
+  };
+}

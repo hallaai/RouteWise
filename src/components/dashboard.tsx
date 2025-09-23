@@ -2,6 +2,7 @@
 "use client";
 
 import * as React from "react";
+import Link from 'next/link';
 import {
   ArrowUpDown,
   Calendar as CalendarIcon,
@@ -61,7 +62,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Task, Target, GeneratedSchedule, TaskType, ScheduleEntry, TargetSchedule } from "@/lib/types";
+import type { Task, Target, GeneratedSchedule, TaskType, ScheduleEntry, TargetSchedule, AppState } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -133,7 +134,13 @@ const getDistance = (
   return distance;
 };
 
-export function Dashboard() {
+interface DashboardProps {
+  appState: AppState;
+  setAppState: React.Dispatch<React.SetStateAction<AppState>>;
+}
+
+
+export function Dashboard({ appState, setAppState }: DashboardProps) {
   const { toast } = useToast();
   const [tasks, setTasks] = React.useState<Task[]>([]);
   const [targets, setTargets] = React.useState<Target[]>([]);
@@ -143,12 +150,6 @@ export function Dashboard() {
   const [selectedTargetIds, setSelectedTargetIds] = React.useState<
     Set<string>
   >(new Set());
-  const [workingDayHours, setWorkingDayHours] = React.useState([8]);
-  const [vehicleSpeed, setVehicleSpeed] = React.useState(70);
-  const [includeHomeTravel, setIncludeHomeTravel] = React.useState({
-    start: true,
-    end: true,
-  });
   const [filter, setFilter] = React.useState("");
   const [sortConfig, setSortConfig] = React.useState<SortConfig>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -160,6 +161,16 @@ export function Dashboard() {
   });
   const [showExtendDayDialog, setShowExtendDayDialog] = React.useState(false);
   const [activeTaskGroups, setActiveTaskGroups] = React.useState<Set<string>>(new Set());
+  
+  // Use state from props, but also check localStorage for client-side persistence
+  React.useEffect(() => {
+    const savedState = localStorage.getItem('appState');
+    if (savedState) {
+      setAppState(JSON.parse(savedState));
+    }
+  }, [setAppState]);
+
+  const { workingDayHours, vehicleSpeed, includeHomeTravel } = appState;
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -291,9 +302,14 @@ export function Dashboard() {
   );
   
   const doesScheduleFit = (schedule: GeneratedSchedule) => {
-    const workingDayMinutes = workingDayHours[0] * 60;
     for (const date in schedule) {
       for (const targetSchedule of schedule[date]) {
+        const target = targets.find(t => t.id === targetSchedule.targetId);
+        if (!target || !target.schedules || target.schedules.length === 0) continue;
+        const [startHour, startMinute] = target.schedules[0].dayStarts.split(':').map(Number);
+        const [endHour, endMinute] = target.schedules[0].dayEnds.split(':').map(Number);
+        const workingDayMinutes = (endHour - startHour) * 60 + (endMinute - startMinute);
+
         if (targetSchedule.totalDuration + targetSchedule.totalTravelTime > workingDayMinutes) {
           return false;
         }
@@ -318,7 +334,6 @@ export function Dashboard() {
         "The AI is optimizing tasks and routes. This may take a moment.",
     });
 
-    // A bit of a hack to get around the async nature of setState
     setTimeout(() => {
         const schedule: GeneratedSchedule = {};
         
@@ -334,34 +349,30 @@ export function Dashboard() {
         const endDay = dateRange?.to || addDays(today, 6);
         const datesToSchedule = eachDayOfInterval({ start: today, end: endDay });
         
-        // Expand recurring tasks
         const allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
         
         originalTasksToSchedule.forEach(task => {
-            if (task.startTime) {
+            if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
                 let currentDate = task.startTime;
-
-                if (task.repeatInterval && task.repeatInterval > 0) {
-                    while (currentDate <= endDay) {
-                        if (currentDate >= today) {
-                             allTaskOccurrences.push({ 
-                                ...task, 
-                                originalId: task.id, 
-                                id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
-                                occurrenceDate: currentDate 
-                            });
-                        }
-                        currentDate = addDays(currentDate, task.repeatInterval);
-                    }
-                } else {
+                 while (currentDate <= endDay) {
                     if (isWithinInterval(currentDate, { start: today, end: endDay })) {
                          allTaskOccurrences.push({ 
                             ...task, 
-                            originalId: task.id,
-                            id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`,
+                            originalId: task.id, 
+                            id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
                             occurrenceDate: currentDate 
                         });
                     }
+                    currentDate = addDays(currentDate, task.repeatInterval);
+                }
+            } else if (task.startTime) {
+                if (isWithinInterval(task.startTime, { start: today, end: endDay })) {
+                     allTaskOccurrences.push({ 
+                        ...task, 
+                        originalId: task.id,
+                        id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`,
+                        occurrenceDate: task.startTime
+                    });
                 }
             }
         });
@@ -383,7 +394,7 @@ export function Dashboard() {
                 
                 const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
                 const endOfDay = setSeconds(setMinutes(setHours(currentDate, endHour), endMinute), 0);
-                const dayEndWithExtension = addMinutes(endOfDay, (workingDayHours[0] - (endHour - startHour)) * 60)
+                const dayEndWithExtension = addMinutes(endOfDay, workingDayHours * 60)
 
                 const scheduledEntries: ScheduleEntry[] = [];
                 let totalDuration = 0;
@@ -401,12 +412,10 @@ export function Dashboard() {
 
                     let arrivalTime = addMinutes(currentTime, travelTime);
                     let taskStartTime = arrivalTime;
-
-                    if (task.startTime) {
-                        const specificStartTimeOnDate = setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0);
-                        if (isBefore(taskStartTime, specificStartTimeOnDate)) {
-                          taskStartTime = specificStartTimeOnDate;
-                        }
+                    
+                    const specificStartTimeOnDate = task.startTime ? setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0) : null;
+                    if (specificStartTimeOnDate && isBefore(taskStartTime, specificStartTimeOnDate)) {
+                        taskStartTime = specificStartTimeOnDate;
                     }
                     
                     const taskEndTime = addMinutes(taskStartTime, task.duration);
@@ -448,13 +457,21 @@ export function Dashboard() {
         for (const date in schedule) {
             for (const ts of schedule[date]) {
                 const requiredMinutes = ts.totalDuration + ts.totalTravelTime;
-                const requiredHours = Math.ceil(requiredMinutes / 60);
-                if (requiredHours > maxRequiredHours) {
-                    maxRequiredHours = requiredHours;
+                 const target = targets.find(t => t.id === ts.targetId);
+                if (!target || !target.schedules || target.schedules.length === 0) continue;
+                const [startHour, startMinute] = target.schedules[0].dayStarts.split(':').map(Number);
+                const [endHour, endMinute] = target.schedules[0].dayEnds.split(':').map(Number);
+                const baseWorkingMinutes = (endHour - startHour) * 60 + (endMinute - startMinute);
+
+                if (requiredMinutes > baseWorkingMinutes) {
+                    const extraHours = Math.ceil((requiredMinutes - baseWorkingMinutes) / 60);
+                    if (extraHours > maxRequiredHours) {
+                        maxRequiredHours = extraHours;
+                    }
                 }
             }
         }
-        setWorkingDayHours([Math.min(12, maxRequiredHours)]);
+        setAppState(prev => ({...prev, workingDayHours: Math.max(1, Math.min(12, maxRequiredHours)) }));
       }
 
       setGeneratedSchedule(schedule);
@@ -500,16 +517,12 @@ export function Dashboard() {
     setActiveTaskGroups(prev => {
       const newSet = new Set(prev);
       if (event.ctrlKey || event.metaKey) {
-        // Toggle the presence of the clicked group
         if (newSet.has(originalId)) {
           newSet.delete(originalId);
         } else {
           newSet.add(originalId);
         }
       } else {
-        // If not holding Ctrl/Cmd, the logic is:
-        // - If the clicked group is the only one selected, deselect it.
-        // - Otherwise, deselect all and select only the clicked group.
         if (newSet.has(originalId) && newSet.size === 1) {
           newSet.clear();
         } else {
@@ -547,7 +560,7 @@ export function Dashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Tasks don't fit in the working day</AlertDialogTitle>
             <AlertDialogDescription>
-              Some tasks cannot be completed within the current working day ({workingDayHours[0]} hours). Would you like to extend the working day to fit all tasks?
+              Some tasks cannot be completed within the current working day. Would you like to extend the working day to fit all tasks? The required extension is calculated automatically.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -563,7 +576,7 @@ export function Dashboard() {
           <Waypoints className="h-6 w-6 text-primary" />
           <h1 className="text-xl font-semibold">RouteWise Scheduler</h1>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-4">
           <input
             type="file"
             ref={fileInputRef}
@@ -571,6 +584,10 @@ export function Dashboard() {
             className="hidden"
             accept=".json"
           />
+           <Link href="/settings" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+             <Settings className="h-5 w-5" />
+             <span>Settings</span>
+          </Link>
           <Button
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
@@ -757,86 +774,6 @@ export function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="lg:col-span-3">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings />
-                    Scheduling Options
-                  </CardTitle>
-                  <CardDescription>
-                    Adjust parameters for the scheduling algorithm.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="work-day">
-                        Extend working day by (hours)
-                      </Label>
-                       <Input
-                          id="work-day"
-                          type="number"
-                          value={workingDayHours[0]}
-                          onChange={(e) => setWorkingDayHours([Number(e.target.value)])}
-                          className="max-w-[150px]"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="vehicle-speed">
-                        Vehicle Speed (km/h)
-                      </Label>
-                      <Input
-                        id="vehicle-speed"
-                        type="number"
-                        value={vehicleSpeed}
-                        onChange={(e) => setVehicleSpeed(Math.min(999, Number(e.target.value)))}
-                        max={999}
-                        className="max-w-[150px]"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="include-start"
-                        checked={includeHomeTravel.start}
-                        onCheckedChange={(checked) =>
-                          setIncludeHomeTravel((prev) => ({
-                            ...prev,
-                            start: !!checked,
-                          }))
-                        }
-                      />
-                      <Label
-                        htmlFor="include-start"
-                        className="flex items-center gap-2"
-                      >
-                        <Home className="h-4 w-4" />
-                        Include travel from home
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="include-end"
-                        checked={includeHomeTravel.end}
-                        onCheckedChange={(checked) =>
-                          setIncludeHomeTravel((prev) => ({
-                            ...prev,
-                            end: !!checked,
-                          }))
-                        }
-                      />
-                      <Label
-                        htmlFor="include-end"
-                        className="flex items-center gap-2"
-                      >
-                        <Home className="h-4 w-4" />
-                        Include travel to home
-                      </Label>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
           <TabsContent value="schedule">
@@ -1036,5 +973,3 @@ export function Dashboard() {
     </div>
   );
 }
-
-    
