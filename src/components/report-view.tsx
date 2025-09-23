@@ -46,6 +46,17 @@ interface DailyMetrics {
     idleTime: number;
 }
 
+interface TargetMetrics {
+    targetId: string;
+    targetName: string;
+    taskCount: number;
+    totalDistance: number;
+    taskTime: number;
+    travelTime: number;
+    idleTime: number;
+}
+
+
 const formatMinutes = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
@@ -61,9 +72,22 @@ const CHART_COLORS = {
 
 export function ReportView({ schedule, tasks, targets, appState, displayedDates }: ReportViewProps) {
   const metrics = React.useMemo(() => {
-    if (!schedule) return { total: null, daily: [] };
+    if (!schedule) return { total: null, daily: [], byTarget: [] };
 
     const dailyMetrics: DailyMetrics[] = [];
+    const targetMetricsAccumulator: { [id: string]: TargetMetrics } = {};
+    targets.forEach(t => {
+        targetMetricsAccumulator[t.id] = {
+            targetId: t.id,
+            targetName: t.name,
+            taskCount: 0,
+            totalDistance: 0,
+            taskTime: 0,
+            travelTime: 0,
+            idleTime: 0,
+        }
+    })
+
     let totalTaskCount = 0;
     let totalDistance = 0;
     let totalTaskTime = 0;
@@ -83,7 +107,10 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
         let dailyIdleTime = 0;
 
         for (const targetSchedule of daySchedule) {
+            const targetId = targetSchedule.targetId;
             dailyTaskCount += targetSchedule.schedule.length;
+            targetMetricsAccumulator[targetId].taskCount += targetSchedule.schedule.length;
+
 
             let lastTaskEndTime: Date | null = null;
             const target = targets.find(t => t.id === targetSchedule.targetId);
@@ -100,16 +127,21 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
                 if (!task) continue;
 
                 dailyTaskTime += task.duration;
+                targetMetricsAccumulator[targetId].taskTime += task.duration;
+                
                 dailyTravelTime += entry.travelTimeFromPrevious || 0;
+                targetMetricsAccumulator[targetId].travelTime += entry.travelTimeFromPrevious || 0;
 
                 const distance = ((entry.travelTimeFromPrevious || 0) / 60) * appState.vehicleSpeed;
                 dailyDistance += distance;
+                targetMetricsAccumulator[targetId].totalDistance += distance;
 
                 const taskStartTime = parseISO(entry.startTime);
                 if (lastTaskEndTime) {
                     const idle = (taskStartTime.getTime() - lastTaskEndTime.getTime()) / 60000 - (entry.travelTimeFromPrevious || 0);
                     if (idle > 0) {
                         dailyIdleTime += idle;
+                        targetMetricsAccumulator[targetId].idleTime += idle;
                     }
                 }
                 lastTaskEndTime = parseISO(entry.endTime);
@@ -142,6 +174,7 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
             idleTime: totalIdleTime,
         },
         daily: dailyMetrics,
+        byTarget: Object.values(targetMetricsAccumulator).filter(tm => tm.taskCount > 0),
     };
   }, [schedule, tasks, targets, appState.vehicleSpeed, displayedDates]);
 
@@ -313,7 +346,45 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
           </Table>
         </CardContent>
       </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Breakdown by Target</CardTitle>
+                <CardDescription>Metrics for each target in the selected period.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Target</TableHead>
+                            <TableHead className="text-right">Tasks</TableHead>
+                            <TableHead className="text-right">Distance</TableHead>
+                            <TableHead className="text-right">Task Time</TableHead>
+                            <TableHead className="text-right">Travel Time</TableHead>
+                            <TableHead className="text-right">Idle Time</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {metrics.byTarget.map((target) => (
+                            <TableRow key={target.targetId}>
+                                <TableCell className="font-medium">{target.targetName}</TableCell>
+                                <TableCell className="text-right">{target.taskCount}</TableCell>
+                                <TableCell className="text-right">{target.totalDistance.toFixed(1)} km</TableCell>
+                                <TableCell className="text-right">{formatMinutes(target.taskTime)}</TableCell>
+                                <TableCell className="text-right">{formatMinutes(target.travelTime)}</TableCell>
+                                <TableCell className="text-right">
+                                    <Badge variant={target.idleTime > 60 ? "destructive" : "secondary"}>
+                                    {formatMinutes(target.idleTime)}
+                                    </Badge>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     </div>
   );
 }
 
+    
