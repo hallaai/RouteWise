@@ -118,6 +118,7 @@ export function Dashboard() {
     Set<string>
   >(new Set());
   const [workingDayHours, setWorkingDayHours] = React.useState([8]);
+  const [vehicleSpeed, setVehicleSpeed] = React.useState([70]);
   const [includeHomeTravel, setIncludeHomeTravel] = React.useState({
     start: true,
     end: true,
@@ -634,6 +635,19 @@ export function Dashboard() {
                       onValueChange={setWorkingDayHours}
                     />
                   </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="vehicle-speed">
+                      Vehicle Speed: {vehicleSpeed[0]} km/h
+                    </Label>
+                    <Slider
+                      id="vehicle-speed"
+                      min={20}
+                      max={120}
+                      step={5}
+                      value={vehicleSpeed}
+                      onValueChange={setVehicleSpeed}
+                    />
+                  </div>
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -831,3 +845,5 @@ export function Dashboard() {
     </div>
   );
 }
+
+    
