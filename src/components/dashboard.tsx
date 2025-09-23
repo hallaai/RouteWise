@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse, differenceInMinutes, isBefore, isWithinInterval, add } from "date-fns";
 import type { DateRange } from "react-day-picker";
+import dynamic from 'next/dynamic';
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import {
   Table,
   TableBody,
@@ -62,11 +62,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Task, Target, GeneratedSchedule, TaskType, ScheduleEntry, TargetSchedule } from "@/lib/types";
-import { MapView } from "./map-view";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
+
+const MapView = dynamic(() => import('./map-view').then(mod => mod.MapView), {
+  ssr: false,
+  loading: () => <p>Loading map...</p>
+});
+
 
 type SortConfig = {
   key: keyof Task;
