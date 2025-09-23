@@ -332,52 +332,42 @@ export function Dashboard() {
         // Expand recurring tasks
         const allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
         
-       originalTasksToSchedule.forEach(task => {
+        originalTasksToSchedule.forEach(task => {
             if (task.startTime) {
-                // This is the first ever occurrence of the task.
-                const firstOccurrenceDate = task.startTime;
+                let currentDate = task.startTime;
 
                 if (task.repeatInterval && task.repeatInterval > 0) {
-                    let currentDate = firstOccurrenceDate;
-                    
-                    // Generate occurrences from the very first date until we are past the schedule's end date
+                    // Loop to generate future occurrences
                     while (currentDate <= endDay) {
-                        // Only add the task if its occurrence falls within the selected date range
-                        if (isWithinInterval(currentDate, { start: today, end: endDay })) {
-                            allTaskOccurrences.push({ 
+                        if (currentDate >= today) {
+                             allTaskOccurrences.push({ 
                                 ...task, 
                                 originalId: task.id, 
                                 id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
                                 occurrenceDate: currentDate 
                             });
                         }
-                        // Move to the next occurrence date
                         currentDate = addDays(currentDate, task.repeatInterval);
                     }
                 } else {
-                    // It's a non-recurring task, just check if it's in the date range
-                    if (isWithinInterval(firstOccurrenceDate, { start: today, end: endDay })) {
+                    // It's a non-recurring task
+                    if (isWithinInterval(currentDate, { start: today, end: endDay })) {
                          allTaskOccurrences.push({ 
                             ...task, 
                             originalId: task.id,
-                            id: `${task.id}-${format(firstOccurrenceDate, 'yyyy-MM-dd')}`,
-                            occurrenceDate: firstOccurrenceDate 
+                            id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`,
+                            occurrenceDate: currentDate 
                         });
                     }
                 }
             } else {
                 // For tasks without a start time, let's assume they can be scheduled on any day within the range.
-                // We'll create one occurrence for each day in the selected range.
-                datesToSchedule.forEach(day => {
-                    allTaskOccurrences.push({ 
-                        ...task, 
-                        originalId: task.id, 
-                        id: `${task.id}-${format(day, 'yyyy-MM-dd')}`, 
-                        occurrenceDate: day 
-                    });
-                });
+                // We will create one occurrence for each day in the selected range. This seems like a weak assumption.
+                // A better approach might be to not schedule them automatically or ask the user.
+                // For now, we will not create occurrences for tasks without a start time to avoid incorrect scheduling.
             }
         });
+
 
         datesToSchedule.forEach(currentDate => {
             const dateStr = format(currentDate, "yyyy-MM-dd");
@@ -532,6 +522,23 @@ export function Dashboard() {
       return newSet;
     });
   };
+
+  const scheduledTaskIds = React.useMemo(() => {
+    if (!generatedSchedule) return new Set<string>();
+    const ids = new Set<string>();
+    Object.values(generatedSchedule).forEach(day => {
+      day.forEach(targetSchedule => {
+        targetSchedule.schedule.forEach(entry => {
+          const originalTask = allTasksForSchedule.find(t => t.id === entry.taskId);
+          if (originalTask?.originalId) {
+            ids.add(originalTask.originalId);
+          }
+        });
+      });
+    });
+    return ids;
+  }, [generatedSchedule, allTasksForSchedule]);
+
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -1015,7 +1022,11 @@ export function Dashboard() {
                   </Card>
                 </TabsContent>
                 <TabsContent value="map">
-                  <MapView />
+                  <MapView 
+                    tasks={tasks} 
+                    scheduledTaskIds={scheduledTaskIds} 
+                    activeTaskGroups={activeTaskGroups}
+                    />
                 </TabsContent>
               </Tabs>
             )}
