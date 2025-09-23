@@ -36,6 +36,12 @@ const MapUpdater = ({ tasks }: { tasks: Task[] }) => {
 
 export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewProps) {
   const [filter, setFilter] = React.useState<FilterType>("all");
+  
+  // Handle client-side only rendering
+  const [isClient, setIsClient] = React.useState(false);
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const filteredTasks = React.useMemo(() => {
     switch (filter) {
@@ -69,12 +75,6 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
       iconAnchor: [isHighlighted ? 9 : 6, isHighlighted ? 9 : 6],
     });
   }
-
-  // Handle client-side only rendering
-  const [isClient, setIsClient] = React.useState(false);
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   if (!isClient) {
     return (
@@ -118,7 +118,7 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {filteredTasks.map(task => {
-                const isHighlighted = task.originalId ? activeTaskGroups.has(task.originalId) : activeTaskGroups.has(task.id);
+                const isHighlighted = activeTaskGroups.has(task.id);
                 return (
                   <Marker 
                     key={task.id} 

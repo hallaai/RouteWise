@@ -342,7 +342,6 @@ export function Dashboard() {
                 let currentDate = task.startTime;
 
                 if (task.repeatInterval && task.repeatInterval > 0) {
-                    // Loop to generate future occurrences
                     while (currentDate <= endDay) {
                         if (currentDate >= today) {
                              allTaskOccurrences.push({ 
@@ -355,7 +354,6 @@ export function Dashboard() {
                         currentDate = addDays(currentDate, task.repeatInterval);
                     }
                 } else {
-                    // It's a non-recurring task
                     if (isWithinInterval(currentDate, { start: today, end: endDay })) {
                          allTaskOccurrences.push({ 
                             ...task, 
@@ -365,11 +363,6 @@ export function Dashboard() {
                         });
                     }
                 }
-            } else {
-                // For tasks without a start time, let's assume they can be scheduled on any day within the range.
-                // We will create one occurrence for each day in the selected range. This seems like a weak assumption.
-                // A better approach might be to not schedule them automatically or ask the user.
-                // For now, we will not create occurrences for tasks without a start time to avoid incorrect scheduling.
             }
         });
 
@@ -482,7 +475,7 @@ export function Dashboard() {
   
   const allTasksForSchedule = React.useMemo(() => {
      if (!generatedSchedule) return [];
-     const allScheduledTasks: (Task & { occurrenceDate?: Date, originalId?: string })[] = [];
+     const allScheduledTasks: (Task & { occurrenceDate?: Date, originalId: string })[] = [];
      Object.values(generatedSchedule).forEach(daySchedule => {
        daySchedule.forEach(ts => {
          ts.schedule.forEach(entry => {
@@ -537,6 +530,8 @@ export function Dashboard() {
           const originalTask = allTasksForSchedule.find(t => t.id === entry.taskId);
           if (originalTask?.originalId) {
             ids.add(originalTask.originalId);
+          } else {
+            ids.add(entry.taskId);
           }
         });
       });
@@ -1041,5 +1036,3 @@ export function Dashboard() {
     </div>
   );
 }
-
-    
