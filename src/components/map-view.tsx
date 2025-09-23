@@ -38,7 +38,7 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
       case "scheduled":
         return tasks.filter(task => scheduledTaskIds.has(task.id));
       case "unscheduled":
-        return tasks.filter(task => !scheduledTaskIds.has(task.id));
+        return tasks.filter(task => !scheduledTaskIds.has(task.id) && scheduledTaskIds.size > 0);
       case "all":
       default:
         return tasks;
@@ -47,33 +47,35 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
   
   React.useEffect(() => {
     // This code runs only on the client.
-    // Set up Leaflet icon paths
-    // @ts-ignore
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconRetinaUrl: iconRetinaUrl.src,
-        iconUrl: iconUrl.src,
-        shadowUrl: shadowUrl.src
-    });
+    // Set up Leaflet icon paths only once
+    if (typeof window !== 'undefined') {
+        // @ts-ignore
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+            iconRetinaUrl: iconRetinaUrl.src,
+            iconUrl: iconUrl.src,
+            shadowUrl: shadowUrl.src
+        });
+    }
 
-    // Initialize map
+    // Initialize map only once
     if (mapContainerRef.current && !mapRef.current) {
         mapRef.current = L.map(mapContainerRef.current).setView([61.498, 23.76], 10); // Default view
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(mapRef.current);
+        
+        markersRef.current = L.markerClusterGroup();
+        mapRef.current.addLayer(markersRef.current);
     }
-    
-    // Handle markers
-    if (mapRef.current) {
-        // Initialize or clear marker cluster group
-        if (markersRef.current) {
-            markersRef.current.clearLayers();
-        } else {
-            markersRef.current = L.markerClusterGroup();
-            mapRef.current.addLayer(markersRef.current);
-        }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+
+  React.useEffect(() => {
+    // Handle markers update when filteredTasks or activeTaskGroups change
+    if (mapRef.current && markersRef.current) {
+        markersRef.current.clearLayers();
 
         const validTasks = filteredTasks.filter(task => 
             task.location && 
@@ -98,7 +100,6 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
                     className: isHighlighted ? 'leaflet-marker-highlighted' : ''
                 });
 
-
                 const marker = L.marker([task.location.lat, task.location.lng], { icon: customIcon });
                 
                 const popupContent = `
@@ -111,10 +112,7 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
                   </div>
                 `;
                 marker.bindPopup(popupContent);
-
-                if(markersRef.current) {
-                    markersRef.current.addLayer(marker);
-                }
+                markersRef.current!.addLayer(marker);
             });
 
             if (mapRef.current && bounds.isValid()) {
@@ -122,7 +120,6 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
             }
         }
     }
-
   }, [filteredTasks, activeTaskGroups]);
 
 
@@ -147,8 +144,8 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
               <Label htmlFor="scheduled">Scheduled</Label>
             </div>
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="unscheduled" id="unscheduled" />
-              <Label htmlFor="unscheduled">Unscheduled</Label>
+              <RadioGroupItem value="unscheduled" id="unscheduled" disabled={scheduledTaskIds.size === 0}/>
+              <Label htmlFor="unscheduled" className={cn(scheduledTaskIds.size === 0 && "text-muted-foreground")}>Unscheduled</Label>
             </div>
           </RadioGroup>
       </CardHeader>
@@ -158,3 +155,5 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
     </Card>
   );
 }
+
+    

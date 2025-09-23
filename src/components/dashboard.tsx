@@ -222,7 +222,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
             const newTargets: Target[] = data.targets.map((target: any, index: number) => ({
               id: target.referenceId || `target-${Date.now()}-${index}`,
               name: target.name,
-              skills: target.skills.map((skill: any) => typeof skill === 'object' && skill !== null ? skill.name : skill),
+              skills: target.skills?.map((skill: any) => typeof skill === 'object' && skill !== null ? skill.name : skill) || [],
               home_location: {
                 lat: target.coordinates.lat,
                 lng: target.coordinates.lon,
@@ -1071,7 +1071,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 </TabsContent>
                 <TabsContent value="map">
                   <MapView 
-                    tasks={tasks} 
+                    tasks={allTasksForSchedule} 
                     scheduledTaskIds={scheduledTaskIds} 
                     activeTaskGroups={activeTaskGroups}
                     />
@@ -1093,3 +1093,5 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
+
+    
