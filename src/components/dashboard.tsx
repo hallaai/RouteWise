@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -763,8 +764,18 @@ export function Dashboard() {
                                     (t) => t.id === ts.targetId
                                   );
                                   if (!target) return null;
-                                  const workingDayMinutes = workingDayHours[0] * 60;
                                   
+                                  const targetScheduleInfo = target.schedules?.[0];
+                                  if (!targetScheduleInfo) return null;
+
+                                  const [startHour, startMinute] = targetScheduleInfo.dayStarts.split(':').map(Number);
+                                  const dayStartTime = setSeconds(setMinutes(setHours(startOfDay(date), startHour), startMinute), 0);
+                                  
+                                  const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
+                                  const dayEndTime = setSeconds(setMinutes(setHours(startOfDay(date), endHour), endMinute), 0);
+                                  const totalWorkMinutes = (dayEndTime.getTime() - dayStartTime.getTime()) / 60000;
+
+
                                   return (
                                     <div key={ts.targetId}>
                                       <div className="flex items-center gap-3 mb-2">
@@ -784,13 +795,12 @@ export function Dashboard() {
                                           if (!task) return null;
                                           const start = new Date(entry.startTime);
                                           const end = new Date(entry.endTime);
-                                          const startOfDayTime = startOfDay(start);
-                                          const startOffsetMinutes = (start.getTime() - startOfDayTime.getTime()) / 60000;
                                           
+                                          const startOffsetMinutes = (start.getTime() - dayStartTime.getTime()) / 60000;
                                           const durationMinutes = task.duration;
 
-                                          const left = (startOffsetMinutes / workingDayMinutes) * 100;
-                                          const width = (durationMinutes / workingDayMinutes) * 100;
+                                          const left = (startOffsetMinutes / totalWorkMinutes) * 100;
+                                          const width = (durationMinutes / totalWorkMinutes) * 100;
                                           const segmentColor = stringToColor(task.segment);
 
 
