@@ -336,8 +336,8 @@ export function Dashboard() {
             // If the task repeats, find all occurrences in the date range
             if (task.repeatInterval && task.repeatInterval > 0) {
               while (currentDate <= endDay) {
-                if (isWithinInterval(currentDate, { start: today, end: endDay })) {
-                  allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, occurrenceDate: currentDate });
+                if (currentDate >= today) {
+                   allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, occurrenceDate: currentDate });
                 }
                 currentDate = addDays(currentDate, task.repeatInterval);
               }
@@ -348,8 +348,6 @@ export function Dashboard() {
             }
           } else {
              // For tasks without a start time, let's assume they can be scheduled on any day within the range.
-             // This might need more refined logic based on requirements.
-             // For now, creating one occurrence for each day in the range for simplicity.
              datesToSchedule.forEach(day => {
                allTaskOccurrences.push({ ...task, originalId: task.id, id: `${task.id}-${format(day, 'yyyy-MM-dd')}`, occurrenceDate: day });
              });
@@ -966,6 +964,8 @@ export function Dashboard() {
     </div>
   );
 }
+
+    
 
     
 
