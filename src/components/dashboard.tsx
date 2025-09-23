@@ -77,6 +77,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
 import { EditTargetDialog } from "./edit-target-dialog";
 import { EditTaskDialog } from "./edit-task-dialog";
+import { Separator } from "./ui/separator";
 
 
 const MapView = dynamic(() => import('./map-view').then(mod => mod.MapView), {
@@ -931,129 +932,138 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                         Visual timeline of tasks for each target for the selected period.
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                      {displayedDates.map(date => {
+                    <CardContent className="space-y-4">
+                      {displayedDates.map((date, dateIndex) => {
                           const dateStr = format(date, "yyyy-MM-dd");
                           const targetSchedules = generatedSchedule[dateStr] || [];
 
                           if(targetSchedules.every(ts => ts.schedule.length === 0)) return null;
                           
                           return (
-                            <div key={dateStr}>
-                              <h3 className="text-lg font-semibold mb-4">
-                                {format(date, "EEEE, MMMM do, yyyy")}
-                              </h3>
-                              <div className="space-y-8">
-                                {targetSchedules.map((ts) => {
-                                  if (ts.schedule.length === 0) return null;
-                                  
-                                  const target = targets.find(
-                                    (t) => t.id === ts.targetId
-                                  );
-                                  if (!target) return null;
-                                  
-                                  const targetScheduleInfo = target.schedules?.[0];
-                                  if (!targetScheduleInfo) return null;
+                            <React.Fragment key={dateStr}>
+                              <div className="flex gap-6 items-start">
+                                <div className="flex flex-col items-center gap-2 sticky top-20">
+                                   <div className="flex flex-col items-center text-muted-foreground">
+                                    <span className="font-semibold text-lg">{format(date, "d")}</span>
+                                    <span>{format(date, "MMM")}</span>
+                                  </div>
+                                  <div style={{ writingMode: 'vertical-rl' }} className="text-sm text-muted-foreground rotate-180">
+                                    {format(date, "EEEE")}
+                                  </div>
+                                </div>
+                                <div className="flex-1 space-y-8">
+                                  {targetSchedules.map((ts) => {
+                                    if (ts.schedule.length === 0) return null;
+                                    
+                                    const target = targets.find(
+                                      (t) => t.id === ts.targetId
+                                    );
+                                    if (!target) return null;
+                                    
+                                    const targetScheduleInfo = target.schedules?.[0];
+                                    if (!targetScheduleInfo) return null;
 
-                                  const [startHour, startMinute] = targetScheduleInfo.dayStarts.split(':').map(Number);
-                                  const dayStartTime = setSeconds(setMinutes(setHours(startOfDay(date), startHour), startMinute), 0);
-                                  
-                                  const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
-                                  const dayEndTime = setSeconds(setMinutes(setHours(startOfDay(date), endHour), endMinute), 0);
-                                  const totalWorkMinutes = (dayEndTime.getTime() - dayStartTime.getTime()) / 60000;
+                                    const [startHour, startMinute] = targetScheduleInfo.dayStarts.split(':').map(Number);
+                                    const dayStartTime = setSeconds(setMinutes(setHours(startOfDay(date), startHour), startMinute), 0);
+                                    
+                                    const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
+                                    const dayEndTime = setSeconds(setMinutes(setHours(startOfDay(date), endHour), endMinute), 0);
+                                    const totalWorkMinutes = (dayEndTime.getTime() - dayStartTime.getTime()) / 60000;
 
 
-                                  return (
-                                    <div key={ts.targetId}>
-                                      <div className="flex items-center gap-3 mb-2">
-                                        <Avatar>
-                                          <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
-                                          <AvatarFallback>
-                                            {target.name.charAt(0)}
-                                          </AvatarFallback>
-                                        </Avatar>
-                                        <h4 className="font-medium">{target.name}</h4>
-                                      </div>
-                                      <div className="relative h-12 w-full rounded-lg bg-secondary">
-                                      {ts.schedule.map((entry, index) => {
-                                        const task = allTasksForSchedule.find(t => t.id === entry.taskId);
-                                        if (!task || !task.originalId) return null;
+                                    return (
+                                      <div key={ts.targetId}>
+                                        <div className="flex items-center gap-3 mb-2">
+                                          <Avatar>
+                                            <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
+                                            <AvatarFallback>
+                                              {target.name.charAt(0)}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <h4 className="font-medium">{target.name}</h4>
+                                        </div>
+                                        <div className="relative h-12 w-full rounded-lg bg-secondary">
+                                        {ts.schedule.map((entry, index) => {
+                                          const task = allTasksForSchedule.find(t => t.id === entry.taskId);
+                                          if (!task || !task.originalId) return null;
 
-                                        const start = new Date(entry.startTime);
-                                        const end = new Date(entry.endTime);
-                                        
-                                        const startOffsetMinutes = (start.getTime() - dayStartTime.getTime()) / 60000;
-                                        const durationMinutes = task.duration;
+                                          const start = new Date(entry.startTime);
+                                          const end = new Date(entry.endTime);
+                                          
+                                          const startOffsetMinutes = (start.getTime() - dayStartTime.getTime()) / 60000;
+                                          const durationMinutes = task.duration;
 
-                                        const left = (startOffsetMinutes / totalWorkMinutes) * 100;
-                                        const width = (durationMinutes / totalWorkMinutes) * 100;
-                                        const segmentColor = stringToColor(task.segment);
+                                          const left = (startOffsetMinutes / totalWorkMinutes) * 100;
+                                          const width = (durationMinutes / totalWorkMinutes) * 100;
+                                          const segmentColor = stringToColor(task.segment);
 
-                                        const travelTime = entry.travelTimeFromPrevious || 0;
-                                        const travelWidth = (travelTime / totalWorkMinutes) * 100;
-                                        const travelLeft = left - travelWidth;
-                                        
-                                        const isGroupActive = activeTaskGroups.has(task.originalId);
+                                          const travelTime = entry.travelTimeFromPrevious || 0;
+                                          const travelWidth = (travelTime / totalWorkMinutes) * 100;
+                                          const travelLeft = left - travelWidth;
+                                          
+                                          const isGroupActive = activeTaskGroups.has(task.originalId);
 
-                                        return (
-                                          <React.Fragment key={entry.taskId}>
-                                            {travelTime > 0 && (
-                                               <TooltipProvider>
-                                                 <Tooltip>
-                                                   <TooltipTrigger asChild>
-                                                      <div
-                                                        className="absolute h-full bg-muted-foreground/30 rounded-md"
-                                                        style={{
-                                                          left: `${travelLeft}%`,
-                                                          width: `${travelWidth}%`,
-                                                        }}
-                                                      />
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                      <p>Travel Time: {travelTime} minutes</p>
-                                                    </TooltipContent>
-                                                  </Tooltip>
-                                               </TooltipProvider>
-                                            )}
-                                            <TooltipProvider>
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <div
-                                                    onClick={(e) => handleTaskGroupClick(task.originalId!, e)}
-                                                    className={cn(
-                                                      "absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer",
-                                                      isGroupActive && "ring-2 ring-offset-2 ring-accent"
+                                          return (
+                                            <React.Fragment key={entry.taskId}>
+                                              {travelTime > 0 && (
+                                                 <TooltipProvider>
+                                                   <Tooltip>
+                                                     <TooltipTrigger asChild>
+                                                        <div
+                                                          className="absolute h-full bg-muted-foreground/30 rounded-md"
+                                                          style={{
+                                                            left: `${travelLeft}%`,
+                                                            width: `${travelWidth}%`,
+                                                          }}
+                                                        />
+                                                      </TooltipTrigger>
+                                                      <TooltipContent>
+                                                        <p>Travel Time: {travelTime} minutes</p>
+                                                      </TooltipContent>
+                                                    </Tooltip>
+                                                 </TooltipProvider>
+                                              )}
+                                              <TooltipProvider>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <div
+                                                      onClick={(e) => handleTaskGroupClick(task.originalId!, e)}
+                                                      className={cn(
+                                                        "absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer",
+                                                        isGroupActive && "ring-2 ring-offset-2 ring-accent"
+                                                      )}
+                                                      style={{
+                                                        left: `${left}%`,
+                                                        width: `${width}%`,
+                                                        backgroundColor: segmentColor,
+                                                      }}
+                                                    >
+                                                      <span className="truncate">{task.name}</span>
+                                                    </div>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>
+                                                    <p className="font-semibold">{task.name}</p>
+                                                    {task.segment && <p>Segment: {task.segment}</p>}
+                                                    <p>
+                                                      {format(start, 'p')} - {format(end, 'p')}
+                                                    </p>
+                                                    {task.repeatInterval && (
+                                                      <p>Repeats every {task.repeatInterval} days</p>
                                                     )}
-                                                    style={{
-                                                      left: `${left}%`,
-                                                      width: `${width}%`,
-                                                      backgroundColor: segmentColor,
-                                                    }}
-                                                  >
-                                                    <span className="truncate">{task.name}</span>
-                                                  </div>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                  <p className="font-semibold">{task.name}</p>
-                                                  {task.segment && <p>Segment: {task.segment}</p>}
-                                                  <p>
-                                                    {format(start, 'p')} - {format(end, 'p')}
-                                                  </p>
-                                                  {task.repeatInterval && (
-                                                    <p>Repeats every {task.repeatInterval} days</p>
-                                                  )}
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            </TooltipProvider>
-                                          </React.Fragment>
-                                        );
-                                      })}
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
+                                            </React.Fragment>
+                                          );
+                                        })}
+                                        </div>
                                       </div>
-                                    </div>
-                                  );
-                                })}
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
+                               {dateIndex < displayedDates.length - 1 && <Separator className="my-6" />}
+                            </React.Fragment>
                           )
                         }
                       )}
