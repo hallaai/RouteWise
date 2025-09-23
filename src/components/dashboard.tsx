@@ -9,6 +9,7 @@ import {
   Calendar as CalendarIcon,
   CheckCircle2,
   ChevronDown,
+  Download,
   Home,
   ListTodo,
   Map,
@@ -65,6 +66,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -660,6 +667,58 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     });
   };
 
+  const downloadFile = (content: string, fileName: string, contentType: string) => {
+    const a = document.createElement("a");
+    const file = new Blob([content], { type: contentType });
+    a.href = URL.createObjectURL(file);
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const handleExportJson = () => {
+    if (!generatedSchedule) return;
+    const dataToExport = {
+      schedule: generatedSchedule,
+      tasks: allTasksForSchedule,
+      targets: targets.filter(t => selectedTargetIds.has(t.id)),
+      dateRange,
+    };
+    const jsonString = JSON.stringify(dataToExport, null, 2);
+    downloadFile(jsonString, `schedule-export-${format(new Date(), 'yyyy-MM-dd')}.json`, 'application/json');
+  };
+
+  const handleExportCsv = () => {
+    if (!generatedSchedule) return;
+    let csvContent = "Date,Target Name,Task Name,Task Start Time,Task End Time,Task Duration (min),Travel Time (min),Task Address,Task Segment\n";
+    
+    Object.entries(generatedSchedule).forEach(([date, daySchedule]) => {
+      daySchedule.forEach(targetSchedule => {
+        const target = targets.find(t => t.id === targetSchedule.targetId);
+        if (!target) return;
+        
+        targetSchedule.schedule.forEach(entry => {
+          const task = allTasksForSchedule.find(t => t.id === entry.taskId);
+          if (!task) return;
+          
+          const row = [
+            date,
+            target.name,
+            task.name,
+            format(parseISO(entry.startTime), 'p'),
+            format(parseISO(entry.endTime), 'p'),
+            task.duration,
+            entry.travelTimeFromPrevious || 0,
+            `"${task.location.address}"`,
+            task.segment || ''
+          ].join(',');
+          csvContent += row + "\n";
+        });
+      });
+    });
+
+    downloadFile(csvContent, `schedule-export-${format(new Date(), 'yyyy-MM-dd')}.csv`, 'text/csv;charset=utf-8;');
+  };
 
 
   return (
@@ -1010,6 +1069,18 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     <TabsTrigger value="map"><Map className="mr-2 h-4 w-4" />Map View</TabsTrigger>
                     <TabsTrigger value="report"><FileText className="mr-2 h-4 w-4" />Report</TabsTrigger>
                   </TabsList>
+                   <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        <Download className="mr-2 h-4 w-4" />
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={handleExportJson}>Export as JSON</DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleExportCsv}>Export as CSV</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <TabsContent value="daily">
                   <Card>
@@ -1196,3 +1267,4 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
 
     
+
