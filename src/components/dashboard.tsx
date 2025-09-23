@@ -154,6 +154,7 @@ export function Dashboard() {
     to: addDays(startOfDay(new Date()), 6),
   });
   const [showExtendDayDialog, setShowExtendDayDialog] = React.useState(false);
+  const [activeTaskGroups, setActiveTaskGroups] = React.useState<Set<string>>(new Set());
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -331,54 +332,59 @@ export function Dashboard() {
         // Expand recurring tasks
         const allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
         
-        originalTasksToSchedule.forEach(task => {
-          if (task.startTime) {
-              if (task.repeatInterval && task.repeatInterval > 0) {
-                  let currentDate = task.startTime;
-                  // Generate occurrences until we are past the schedule's end date
-                  while (currentDate <= endDay) {
-                      if (isWithinInterval(currentDate, { start: today, end: endDay })) {
-                          allTaskOccurrences.push({ 
-                              ...task, 
-                              originalId: task.id, 
-                              id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
-                              occurrenceDate: currentDate 
-                          });
-                      }
-                      currentDate = addDays(currentDate, task.repeatInterval);
-                  }
-              } else {
-                  // It's a non-recurring task, just check if it's in the date range
-                  if (isWithinInterval(task.startTime, { start: today, end: endDay })) {
-                      allTaskOccurrences.push({ 
-                          ...task, 
-                          originalId: task.id, 
-                          id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, 
-                          occurrenceDate: task.startTime 
-                      });
-                  }
-              }
-          } else {
-              // For tasks without a start time, let's assume they can be scheduled on any day within the range.
-              // We'll create one occurrence for each day in the selected range.
-              datesToSchedule.forEach(day => {
-                  allTaskOccurrences.push({ 
-                      ...task, 
-                      originalId: task.id, 
-                      id: `${task.id}-${format(day, 'yyyy-MM-dd')}`, 
-                      occurrenceDate: day 
-                  });
-              });
-          }
-      });
+       originalTasksToSchedule.forEach(task => {
+            if (task.startTime) {
+                // This is the first ever occurrence of the task.
+                const firstOccurrenceDate = task.startTime;
 
+                if (task.repeatInterval && task.repeatInterval > 0) {
+                    let currentDate = firstOccurrenceDate;
+                    
+                    // Generate occurrences from the very first date until we are past the schedule's end date
+                    while (currentDate <= endDay) {
+                        // Only add the task if its occurrence falls within the selected date range
+                        if (isWithinInterval(currentDate, { start: today, end: endDay })) {
+                            allTaskOccurrences.push({ 
+                                ...task, 
+                                originalId: task.id, 
+                                id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
+                                occurrenceDate: currentDate 
+                            });
+                        }
+                        // Move to the next occurrence date
+                        currentDate = addDays(currentDate, task.repeatInterval);
+                    }
+                } else {
+                    // It's a non-recurring task, just check if it's in the date range
+                    if (isWithinInterval(firstOccurrenceDate, { start: today, end: endDay })) {
+                         allTaskOccurrences.push({ 
+                            ...task, 
+                            originalId: task.id,
+                            id: `${task.id}-${format(firstOccurrenceDate, 'yyyy-MM-dd')}`,
+                            occurrenceDate: firstOccurrenceDate 
+                        });
+                    }
+                }
+            } else {
+                // For tasks without a start time, let's assume they can be scheduled on any day within the range.
+                // We'll create one occurrence for each day in the selected range.
+                datesToSchedule.forEach(day => {
+                    allTaskOccurrences.push({ 
+                        ...task, 
+                        originalId: task.id, 
+                        id: `${task.id}-${format(day, 'yyyy-MM-dd')}`, 
+                        occurrenceDate: day 
+                    });
+                });
+            }
+        });
 
         datesToSchedule.forEach(currentDate => {
             const dateStr = format(currentDate, "yyyy-MM-dd");
             schedule[dateStr] = [];
 
-            const tasksForThisDay = allTaskOccurrences.filter(t => format(t.occurrenceDate, 'yyyy-MM-dd') === dateStr);
-            const tasksToScheduleThisDay = new Set(tasksForThisDay.map(t => t.id));
+            let tasksForThisDay = allTaskOccurrences.filter(t => format(t.occurrenceDate, 'yyyy-MM-dd') === dateStr);
+            let tasksToScheduleThisDay = new Set(tasksForThisDay);
 
             targetsForScheduling.forEach(target => {
                 const targetScheduleInfo = target.schedules?.[0];
@@ -389,6 +395,7 @@ export function Dashboard() {
                 
                 const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
                 const endOfDay = setSeconds(setMinutes(setHours(currentDate, endHour), endMinute), 0);
+                const dayEndWithExtension = addMinutes(endOfDay, (workingDayHours[0] - (endHour - startHour)) * 60)
 
                 const scheduledEntries: ScheduleEntry[] = [];
                 let totalDuration = 0;
@@ -399,10 +406,8 @@ export function Dashboard() {
 
 
                 const tempTasks = Array.from(tasksToScheduleThisDay);
-                for (const taskId of tempTasks) {
-                    const task = tasksForThisDay.find(t => t.id === taskId);
-                    if (!task) continue;
 
+                for (const task of tempTasks) {
                     const distance = getDistance(lastLocation.lat, lastLocation.lng, task.location.lat, task.location.lng);
                     const travelTime = Math.round((distance / vehicleSpeed) * 60); // in minutes
 
@@ -410,17 +415,17 @@ export function Dashboard() {
                     let taskStartTime = arrivalTime;
 
                     if (task.startTime) {
-                        const specificStartTime = setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0);
-                        if (isBefore(taskStartTime, specificStartTime)) {
-                          taskStartTime = specificStartTime;
+                        const specificStartTimeOnDate = setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0);
+                        if (isBefore(taskStartTime, specificStartTimeOnDate)) {
+                          taskStartTime = specificStartTimeOnDate;
                         }
                     }
                     
                     const taskEndTime = addMinutes(taskStartTime, task.duration);
                    
-                    if (taskEndTime <= endOfDay) {
+                    if (taskEndTime <= dayEndWithExtension) {
                         scheduledEntries.push({
-                            taskId: taskId,
+                            taskId: task.id,
                             startTime: taskStartTime.toISOString(),
                             endTime: taskEndTime.toISOString(),
                             travelTimeFromPrevious: travelTime,
@@ -430,7 +435,7 @@ export function Dashboard() {
                         totalTravelTime += travelTime;
                         currentTime = taskEndTime;
                         lastLocation = task.location;
-                        tasksToScheduleThisDay.delete(taskId);
+                        tasksToScheduleThisDay.delete(task);
                     }
                 }
                 
@@ -490,7 +495,11 @@ export function Dashboard() {
            if(originalTask) {
              const existing = allScheduledTasks.find(t => t.id === entry.taskId);
              if (!existing) {
-                allScheduledTasks.push({ ...originalTask, id: entry.taskId });
+                allScheduledTasks.push({ 
+                    ...originalTask, 
+                    id: entry.taskId, 
+                    originalId: originalTask.id 
+                });
              }
            }
          });
@@ -499,6 +508,30 @@ export function Dashboard() {
      return allScheduledTasks;
   }, [generatedSchedule, tasks]);
 
+  const handleTaskGroupClick = (originalId: string, event: React.MouseEvent) => {
+    setActiveTaskGroups(prev => {
+      const newSet = new Set(prev);
+      if (event.ctrlKey || event.metaKey) {
+        // Toggle the presence of the clicked group
+        if (newSet.has(originalId)) {
+          newSet.delete(originalId);
+        } else {
+          newSet.add(originalId);
+        }
+      } else {
+        // If not holding Ctrl/Cmd, the logic is:
+        // - If the clicked group is the only one selected, deselect it.
+        // - Otherwise, deselect all and select only the clicked group.
+        if (newSet.has(originalId) && newSet.size === 1) {
+          newSet.clear();
+        } else {
+          newSet.clear();
+          newSet.add(originalId);
+        }
+      }
+      return newSet;
+    });
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -728,31 +761,32 @@ export function Dashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-6">
-                  <div className="grid gap-2">
-                    <Label htmlFor="work-day">
-                      Working Day Length: {workingDayHours[0]} hours
-                    </Label>
-                    <Slider
-                      id="work-day"
-                      min={4}
-                      max={12}
-                      step={0.5}
-                      value={workingDayHours}
-                      onValueChange={setWorkingDayHours}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="vehicle-speed">
-                      Vehicle Speed (km/h)
-                    </Label>
-                    <Input
-                      id="vehicle-speed"
-                      type="number"
-                      value={vehicleSpeed}
-                      onChange={(e) => setVehicleSpeed(Math.min(999, Number(e.target.value)))}
-                      max={999}
-                      className="max-w-[150px]"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="work-day">
+                        Extend working day by (hours)
+                      </Label>
+                       <Input
+                          id="work-day"
+                          type="number"
+                          value={workingDayHours[0]}
+                          onChange={(e) => setWorkingDayHours([Number(e.target.value)])}
+                          className="max-w-[150px]"
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="vehicle-speed">
+                        Vehicle Speed (km/h)
+                      </Label>
+                      <Input
+                        id="vehicle-speed"
+                        type="number"
+                        value={vehicleSpeed}
+                        onChange={(e) => setVehicleSpeed(Math.min(999, Number(e.target.value)))}
+                        max={999}
+                        className="max-w-[150px]"
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
@@ -897,7 +931,7 @@ export function Dashboard() {
                                       <div className="relative h-12 w-full rounded-lg bg-secondary">
                                       {ts.schedule.map((entry, index) => {
                                         const task = allTasksForSchedule.find(t => t.id === entry.taskId);
-                                        if (!task) return null;
+                                        if (!task || !task.originalId) return null;
 
                                         const start = new Date(entry.startTime);
                                         const end = new Date(entry.endTime);
@@ -912,6 +946,8 @@ export function Dashboard() {
                                         const travelTime = entry.travelTimeFromPrevious || 0;
                                         const travelWidth = (travelTime / totalWorkMinutes) * 100;
                                         const travelLeft = left - travelWidth;
+                                        
+                                        const isGroupActive = activeTaskGroups.has(task.originalId);
 
                                         return (
                                           <React.Fragment key={entry.taskId}>
@@ -937,7 +973,11 @@ export function Dashboard() {
                                               <Tooltip>
                                                 <TooltipTrigger asChild>
                                                   <div
-                                                    className="absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md hover:opacity-90 transition-all"
+                                                    onClick={(e) => handleTaskGroupClick(task.originalId!, e)}
+                                                    className={cn(
+                                                      "absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer",
+                                                      isGroupActive && "ring-2 ring-offset-2 ring-accent"
+                                                    )}
                                                     style={{
                                                       left: `${left}%`,
                                                       width: `${width}%`,
@@ -985,13 +1025,5 @@ export function Dashboard() {
     </div>
   );
 }
-
-    
-
-    
-
-    
-
-    
 
     
