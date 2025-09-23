@@ -560,6 +560,22 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
      return allScheduledTasks;
   }, [generatedSchedule, tasks]);
 
+  const tasksForMap = React.useMemo(() => {
+    if (!generatedSchedule || !dateRange?.from) return [];
+    const to = dateRange.to || dateRange.from;
+    const interval = { start: dateRange.from, end: to };
+
+    return allTasksForSchedule.filter(task => {
+        const entry = Object.values(generatedSchedule)
+            .flat()
+            .flatMap(ts => ts.schedule)
+            .find(e => e.taskId === task.id);
+        if (!entry) return false;
+        const startTime = parseISO(entry.startTime);
+        return isWithinInterval(startTime, interval);
+    });
+  }, [generatedSchedule, dateRange, allTasksForSchedule]);
+
   const handleTaskGroupClick = (originalId: string, event: React.MouseEvent) => {
     setActiveTaskGroups(prev => {
       const newSet = new Set(prev);
@@ -1071,7 +1087,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 </TabsContent>
                 <TabsContent value="map">
                   <MapView 
-                    tasks={allTasksForSchedule} 
+                    tasks={tasksForMap} 
                     scheduledTaskIds={scheduledTaskIds} 
                     activeTaskGroups={activeTaskGroups}
                     />
@@ -1093,5 +1109,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
+
+    
 
     
