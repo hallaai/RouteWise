@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -209,7 +210,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
               type: getTaskType(work),
               priority: 'medium', // Default priority
               segment: work.segment,
-              skills: work.skills || [],
+              skills: work.skills?.map((skill: any) => typeof skill === 'object' && skill !== null ? skill.name : skill) || [],
               startTime: work.startTime ? parseISO(work.startTime) : undefined,
               endTime: work.endTime ? parseISO(work.endTime) : undefined,
               repeatInterval: work.repeatInterval,
@@ -1074,6 +1075,8 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
+
+    
 
     
 
