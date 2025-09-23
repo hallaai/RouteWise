@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import * as React from "react";
@@ -20,7 +19,7 @@ import {
   Upload,
   Clock,
 } from "lucide-react";
-import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse } from "date-fns";
+import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse, differenceInMinutes, isBefore } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +61,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import type { Task, Target, GeneratedSchedule, TaskType } from "@/lib/types";
+import type { Task, Target, GeneratedSchedule, TaskType, ScheduleEntry, TargetSchedule } from "@/lib/types";
 import { MapView } from "./map-view";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -106,6 +105,27 @@ const getTaskType = (work: any): TaskType => {
   }
   // Add more specific rules if needed
   return 'maintenance'; // Default fallback
+};
+
+// Haversine formula to calculate distance between two lat/lng points
+const getDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) => {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in km
+  return distance;
 };
 
 export function Dashboard() {
@@ -291,71 +311,90 @@ export function Dashboard() {
         "The AI is optimizing tasks and routes. This may take a moment.",
     });
 
+    // A bit of a hack to get around the async nature of setState
     setTimeout(() => {
-      const schedule: GeneratedSchedule = {};
-      const tasksToSchedule = new Set(selectedTaskIds);
-      const targetsForScheduling = Array.from(selectedTargetIds)
-        .map(id => targets.find(t => t.id === id))
-        .filter((t): t is Target => !!t);
-      
-      const today = dateRange?.from || startOfDay(new Date());
-      const endDay = dateRange?.to || addDays(today, 6);
-      const datesToSchedule = eachDayOfInterval({start: today, end: endDay});
+        const schedule: GeneratedSchedule = {};
+        const tasksToSchedule = new Set(Array.from(selectedTaskIds));
+        const targetsForScheduling = Array.from(selectedTargetIds)
+            .map(id => targets.find(t => t.id === id))
+            .filter((t): t is Target => !!t);
 
-      datesToSchedule.forEach(currentDate => {
-        const dateStr = format(currentDate, "yyyy-MM-dd");
-        schedule[dateStr] = [];
+        const today = dateRange?.from || startOfDay(new Date());
+        const endDay = dateRange?.to || addDays(today, 6);
+        const datesToSchedule = eachDayOfInterval({ start: today, end: endDay });
 
-        targetsForScheduling.forEach(target => {
-          const targetSchedule = target.schedules?.[0];
-          if (!targetSchedule) return;
+        datesToSchedule.forEach(currentDate => {
+            const dateStr = format(currentDate, "yyyy-MM-dd");
+            schedule[dateStr] = [];
 
-          const [startHour, startMinute] = targetSchedule.dayStarts.split(':').map(Number);
-          
-          let currentTime = setSeconds(setMinutes(setHours(currentDate, startHour), startMinute), 0);
+            targetsForScheduling.forEach(target => {
+                const targetScheduleInfo = target.schedules?.[0];
+                if (!targetScheduleInfo) return;
 
-          const scheduledEntries = [];
-          let totalDuration = 0;
-          let totalTravelTime = 0;
-
-          const tempTasks = Array.from(tasksToSchedule);
-          for(const taskId of tempTasks) {
-            const task = tasks.find(t => t.id === taskId);
-            if (!task) continue;
-
-            const taskStartTime = task.startTime ? task.startTime : currentTime;
-
-            if (taskStartTime >= currentTime) {
-              const travelTime = 15; // mock travel time
-              const taskEndTime = addMinutes(taskStartTime, task.duration);
-              
-              const targetDayEnds = parse(targetSchedule.dayEnds, 'HH:mm', new Date());
-              const endOfDay = setSeconds(setMinutes(setHours(currentDate, targetDayEnds.getHours()), targetDayEnds.getMinutes()), 0);
-
-              if(taskEndTime <= endOfDay) {
-                scheduledEntries.push({
-                    taskId: taskId,
-                    startTime: taskStartTime.toISOString(),
-                    endTime: taskEndTime.toISOString(),
-                });
+                const [startHour, startMinute] = targetScheduleInfo.dayStarts.split(':').map(Number);
+                let currentTime = setSeconds(setMinutes(setHours(currentDate, startHour), startMinute), 0);
                 
-                totalDuration += task.duration;
-                totalTravelTime += travelTime;
-                currentTime = addMinutes(taskEndTime, travelTime);
-                tasksToSchedule.delete(taskId);
-              }
-            }
-          }
+                const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
+                const endOfDay = setSeconds(setMinutes(setHours(currentDate, endHour), endMinute), 0);
 
-          schedule[dateStr].push({
-              targetId: target.id,
-              schedule: scheduledEntries,
-              route: [],
-              totalDuration: totalDuration,
-              totalTravelTime: totalTravelTime
-          });
+                const scheduledEntries: ScheduleEntry[] = [];
+                let totalDuration = 0;
+                let totalTravelTime = 0;
+                let lastLocation = target.home_location;
+                
+                const route: TargetSchedule['route'] = [];
+
+
+                const tempTasks = Array.from(tasksToSchedule);
+                for (const taskId of tempTasks) {
+                    const task = tasks.find(t => t.id === taskId);
+                    if (!task) continue;
+
+                    // Check if task has a specific date and if it matches the current scheduling date
+                    if (task.startTime && format(task.startTime, 'yyyy-MM-dd') !== dateStr) {
+                      continue;
+                    }
+
+                    const distance = getDistance(lastLocation.lat, lastLocation.lng, task.location.lat, task.location.lng);
+                    const travelTime = Math.round((distance / vehicleSpeed) * 60); // in minutes
+
+                    let arrivalTime = addMinutes(currentTime, travelTime);
+                    let taskStartTime = arrivalTime;
+
+                    if (task.startTime) {
+                        const specificStartTime = setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0);
+                        if (isBefore(taskStartTime, specificStartTime)) {
+                          taskStartTime = specificStartTime;
+                        }
+                    }
+                    
+                    const taskEndTime = addMinutes(taskStartTime, task.duration);
+                   
+                    if (taskEndTime <= endOfDay) {
+                        scheduledEntries.push({
+                            taskId: taskId,
+                            startTime: taskStartTime.toISOString(),
+                            endTime: taskEndTime.toISOString(),
+                            travelTimeFromPrevious: travelTime,
+                        });
+                        
+                        totalDuration += task.duration;
+                        totalTravelTime += travelTime;
+                        currentTime = taskEndTime;
+                        lastLocation = task.location;
+                        tasksToSchedule.delete(taskId);
+                    }
+                }
+                
+                schedule[dateStr].push({
+                    targetId: target.id,
+                    schedule: scheduledEntries,
+                    route: route,
+                    totalDuration: totalDuration,
+                    totalTravelTime: totalTravelTime
+                });
+            });
         });
-      });
 
       if (!extendDay && !doesScheduleFit(schedule)) {
         setShowExtendDayDialog(true);
@@ -384,7 +423,7 @@ export function Dashboard() {
         title: "Schedule Generated Successfully!",
         description: "View the new schedule in the 'Schedule' tab.",
       });
-    }, 2000);
+    }, 500);
   };
   
   const displayedDates = React.useMemo(() => {
@@ -788,24 +827,45 @@ export function Dashboard() {
                                         <h4 className="font-medium">{target.name}</h4>
                                       </div>
                                       <div className="relative h-12 w-full rounded-lg bg-secondary">
-                                        {ts.schedule.map((entry) => {
-                                          const task = tasks.find(
-                                            (t) => t.id === entry.taskId
-                                          );
-                                          if (!task) return null;
-                                          const start = new Date(entry.startTime);
-                                          const end = new Date(entry.endTime);
-                                          
-                                          const startOffsetMinutes = (start.getTime() - dayStartTime.getTime()) / 60000;
-                                          const durationMinutes = task.duration;
+                                      {ts.schedule.map((entry, index) => {
+                                        const task = tasks.find(t => t.id === entry.taskId);
+                                        if (!task) return null;
 
-                                          const left = (startOffsetMinutes / totalWorkMinutes) * 100;
-                                          const width = (durationMinutes / totalWorkMinutes) * 100;
-                                          const segmentColor = stringToColor(task.segment);
+                                        const start = new Date(entry.startTime);
+                                        const end = new Date(entry.endTime);
+                                        
+                                        const startOffsetMinutes = (start.getTime() - dayStartTime.getTime()) / 60000;
+                                        const durationMinutes = task.duration;
 
+                                        const left = (startOffsetMinutes / totalWorkMinutes) * 100;
+                                        const width = (durationMinutes / totalWorkMinutes) * 100;
+                                        const segmentColor = stringToColor(task.segment);
 
-                                          return (
-                                            <TooltipProvider key={entry.taskId}>
+                                        const travelTime = entry.travelTimeFromPrevious || 0;
+                                        const travelWidth = (travelTime / totalWorkMinutes) * 100;
+                                        const travelLeft = left - travelWidth;
+
+                                        return (
+                                          <React.Fragment key={entry.taskId}>
+                                            {travelTime > 0 && (
+                                               <TooltipProvider>
+                                                 <Tooltip>
+                                                   <TooltipTrigger asChild>
+                                                      <div
+                                                        className="absolute h-full bg-muted-foreground/30 rounded-md"
+                                                        style={{
+                                                          left: `${travelLeft}%`,
+                                                          width: `${travelWidth}%`,
+                                                        }}
+                                                      />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                      <p>Travel Time: {travelTime} minutes</p>
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                               </TooltipProvider>
+                                            )}
+                                            <TooltipProvider>
                                               <Tooltip>
                                                 <TooltipTrigger asChild>
                                                   <div
@@ -828,8 +888,9 @@ export function Dashboard() {
                                                 </TooltipContent>
                                               </Tooltip>
                                             </TooltipProvider>
-                                          );
-                                        })}
+                                          </React.Fragment>
+                                        );
+                                      })}
                                       </div>
                                     </div>
                                   );
@@ -853,3 +914,5 @@ export function Dashboard() {
     </div>
   );
 }
+
+    

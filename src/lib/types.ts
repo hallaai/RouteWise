@@ -40,6 +40,7 @@ export interface ScheduleEntry {
   taskId: string;
   startTime: string; // ISO 8601 format
   endTime: string;   // ISO 8601 format
+  travelTimeFromPrevious?: number; // in minutes
 }
 
 export interface TargetSchedule {
@@ -56,5 +57,7 @@ export interface TargetSchedule {
 export interface GeneratedSchedule {
   [date: string]: TargetSchedule[];
 }
+
+    
 
     
