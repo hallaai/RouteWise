@@ -25,7 +25,7 @@ import {
   Pencil,
   FileText,
 } from "lucide-react";
-import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, isWithinInterval } from "date-fns";
+import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, isWithinInterval, isAfter } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import dynamic from 'next/dynamic';
 
@@ -158,6 +158,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
   const [activeTaskGroups, setActiveTaskGroups] = React.useState<Set<string>>(new Set());
   const [editingTarget, setEditingTarget] = React.useState<Target | null>(null);
   const [editingTask, setEditingTask] = React.useState<Task | "new" | null>(null);
+  const [deletionTarget, setDeletionTarget] = React.useState<{type: 'day' | 'target'; date: string; targetId?: string} | null>(null);
 
   
   // Use state from props, but also check localStorage for client-side persistence
@@ -602,6 +603,64 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     return ids;
   }, [generatedSchedule, allTasksForSchedule]);
 
+  const handleDeleteScheduleEntries = (mode: 'single' | 'all-recurring') => {
+    if (!deletionTarget || !generatedSchedule) return;
+
+    const { type, date, targetId } = deletionTarget;
+    const newSchedule = { ...generatedSchedule };
+
+    let taskIdsToRemove = new Set<string>();
+
+    if (type === 'day') {
+        (newSchedule[date] || []).forEach(ts => {
+            ts.schedule.forEach(entry => taskIdsToRemove.add(entry.taskId));
+        });
+    } else if (type === 'target' && targetId) {
+        const ts = (newSchedule[date] || []).find(ts => ts.targetId === targetId);
+        (ts?.schedule || []).forEach(entry => taskIdsToRemove.add(entry.taskId));
+    }
+
+    // If mode is 'all-recurring', find all future occurrences as well
+    if (mode === 'all-recurring') {
+        const recurringOriginalIds = new Set<string>();
+        taskIdsToRemove.forEach(taskId => {
+            const task = allTasksForSchedule.find(t => t.id === taskId);
+            if (task?.originalId && task.repeatInterval) {
+                recurringOriginalIds.add(task.originalId);
+            }
+        });
+
+        Object.keys(newSchedule).forEach(d => {
+            if (isAfter(parseISO(d), parseISO(date))) {
+                 newSchedule[d].forEach(ts => {
+                    ts.schedule.forEach(entry => {
+                        const task = allTasksForSchedule.find(t => t.id === entry.taskId);
+                         if (task?.originalId && recurringOriginalIds.has(task.originalId)) {
+                             taskIdsToRemove.add(entry.taskId);
+                         }
+                    });
+                 });
+            }
+        });
+    }
+
+    // Now, filter the schedule
+    Object.keys(newSchedule).forEach(d => {
+        newSchedule[d] = newSchedule[d].map(ts => ({
+            ...ts,
+            schedule: ts.schedule.filter(entry => !taskIdsToRemove.has(entry.taskId))
+        }));
+    });
+
+    setGeneratedSchedule(newSchedule);
+    setDeletionTarget(null);
+    toast({
+        title: "Schedule Updated",
+        description: "The selected tasks have been removed from the calendar."
+    });
+  };
+
+
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -624,6 +683,29 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {deletionTarget && (
+         <AlertDialog open={!!deletionTarget} onOpenChange={() => setDeletionTarget(null)}>
+            <AlertDialogContent className="sm:max-w-xl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>Clear scheduled tasks?</AlertDialogTitle>
+                <AlertDialogDescription>
+                This will remove tasks from the calendar. This action cannot be undone. How should recurring tasks be handled?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button variant="outline" onClick={() => handleDeleteScheduleEntries('single')}>
+                    Remove Only These Tasks
+                </Button>
+                <AlertDialogAction onClick={() => handleDeleteScheduleEntries('all-recurring')}>
+                    Remove These and All Future Occurrences
+                </AlertDialogAction>
+            </AlertDialogFooter>
+            </AlertDialogContent>
+         </AlertDialog>
+      )}
+
         {editingTarget && (
         <EditTargetDialog
           target={editingTarget}
@@ -942,9 +1024,14 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                             <React.Fragment key={dateStr}>
                               <div className="flex gap-6 items-start">
                                 <div className="flex flex-col items-center gap-2 sticky top-20">
-                                   <div className="flex flex-col items-center text-muted-foreground">
-                                    <span className="font-semibold text-lg">{format(date, "d")}</span>
-                                    <span>{format(date, "MMM")}</span>
+                                   <div className="flex items-center gap-2 text-muted-foreground">
+                                        <div className="flex flex-col items-center">
+                                            <span className="font-semibold text-lg">{format(date, "d")}</span>
+                                            <span>{format(date, "MMM")}</span>
+                                        </div>
+                                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeletionTarget({ type: 'day', date: dateStr })}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
                                   </div>
                                   <div style={{ writingMode: 'vertical-rl' }} className="text-sm text-muted-foreground rotate-180">
                                     {format(date, "EEEE")}
@@ -982,6 +1069,9 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                                             </Avatar>
                                           )}
                                           <h4 className="font-medium">{target.name}</h4>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDeletionTarget({ type: 'target', date: dateStr, targetId: ts.targetId })}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                          </Button>
                                         </div>
                                         <div className="relative h-8 w-full rounded-lg bg-secondary">
                                         {ts.schedule.map((entry, index) => {
@@ -1103,3 +1193,6 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     
 
 
+
+
+    
