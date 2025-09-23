@@ -28,6 +28,14 @@ import { PieChart, Pie, Cell, Tooltip } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import type { GeneratedSchedule, Task, Target, AppState } from "@/lib/types";
 import { format, parseISO } from "date-fns";
+import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Download } from "lucide-react";
 
 interface ReportViewProps {
   schedule: GeneratedSchedule | null;
@@ -205,6 +213,42 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
       },
   }
 
+  const downloadFile = (content: string, fileName: string, contentType: string) => {
+    const a = document.createElement("a");
+    const file = new Blob([content], { type: contentType });
+    a.href = URL.createObjectURL(file);
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  
+  const handleExportDaily = (format: "json" | "csv") => {
+    if (format === 'json') {
+      const jsonString = JSON.stringify(metrics.daily, null, 2);
+      downloadFile(jsonString, `daily-breakdown-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+    } else {
+      const headers = "Date,Tasks,Distance (km),Task Time (min),Travel Time (min),Idle Time (min)\n";
+      const csvContent = metrics.daily.map(d => 
+        `${d.date},${d.taskCount},${d.totalDistance.toFixed(1)},${d.taskTime},${d.travelTime},${d.idleTime}`
+      ).join('\n');
+      downloadFile(headers + csvContent, `daily-breakdown-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+    }
+  };
+
+  const handleExportByTarget = (format: "json" | "csv") => {
+    if (format === 'json') {
+      const jsonString = JSON.stringify(metrics.byTarget, null, 2);
+      downloadFile(jsonString, `target-breakdown-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+    } else {
+      const headers = "Target,Tasks,Distance (km),Task Time (min),Travel Time (min),Idle Time (min)\n";
+      const csvContent = metrics.byTarget.map(t => 
+        `${t.targetName},${t.taskCount},${t.totalDistance.toFixed(1)},${t.taskTime},${t.travelTime},${t.idleTime}`
+      ).join('\n');
+      downloadFile(headers + csvContent, `target-breakdown-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
+    }
+  };
+
+
   if (!metrics.total || metrics.total.taskCount === 0) {
     return (
       <Card>
@@ -311,9 +355,23 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Daily Breakdown</CardTitle>
-          <CardDescription>Metrics for each day in the selected period.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Daily Breakdown</CardTitle>
+            <CardDescription>Metrics for each day in the selected period.</CardDescription>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => handleExportDaily('json')}>Export as JSON</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportDaily('csv')}>Export as CSV</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardHeader>
         <CardContent>
           <Table>
@@ -348,9 +406,23 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
       </Card>
 
         <Card>
-            <CardHeader>
-                <CardTitle>Breakdown by Target</CardTitle>
-                <CardDescription>Metrics for each target in the selected period.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Breakdown by Target</CardTitle>
+                  <CardDescription>Metrics for each target in the selected period.</CardDescription>
+                </div>
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        <Download className="mr-2 h-4 w-4" />
+                        Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleExportByTarget('json')}>Export as JSON</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportByTarget('csv')}>Export as CSV</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
             </CardHeader>
             <CardContent>
                  <Table>
@@ -386,5 +458,3 @@ export function ReportView({ schedule, tasks, targets, appState, displayedDates 
     </div>
   );
 }
-
-    
