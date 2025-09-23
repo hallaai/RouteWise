@@ -19,6 +19,8 @@ import {
   Wrench,
   Upload,
   Clock,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse, differenceInMinutes, isBefore, isWithinInterval, add } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -35,7 +37,6 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -61,12 +62,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { useToast } from "@/hooks/use-toast";
 import type { Task, Target, GeneratedSchedule, TaskType, ScheduleEntry, TargetSchedule, AppState } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Calendar } from "./ui/calendar";
+import { EditTargetDialog } from "./edit-target-dialog";
+import { EditTaskDialog } from "./edit-task-dialog";
+
 
 const MapView = dynamic(() => import('./map-view').then(mod => mod.MapView), {
   ssr: false,
@@ -161,6 +170,9 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
   });
   const [showExtendDayDialog, setShowExtendDayDialog] = React.useState(false);
   const [activeTaskGroups, setActiveTaskGroups] = React.useState<Set<string>>(new Set());
+  const [editingTarget, setEditingTarget] = React.useState<Target | null>(null);
+  const [editingTask, setEditingTask] = React.useState<Task | "new" | null>(null);
+
   
   // Use state from props, but also check localStorage for client-side persistence
   React.useEffect(() => {
@@ -185,7 +197,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
           
           if (data.works && data.targets) {
             const newTasks: Task[] = data.works.map((work: any, index: number) => ({
-              id: work.referenceId || `task-${index}`,
+              id: work.referenceId || `task-${Date.now()}-${index}`,
               name: work.name,
               location: {
                 address: `${work.address.street}, ${work.address.city}`,
@@ -196,13 +208,14 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
               type: getTaskType(work),
               priority: 'medium', // Default priority
               segment: work.segment,
+              skills: work.skills || [],
               startTime: work.startTime ? parseISO(work.startTime) : undefined,
               endTime: work.endTime ? parseISO(work.endTime) : undefined,
               repeatInterval: work.repeatInterval,
             }));
 
             const newTargets: Target[] = data.targets.map((target: any, index: number) => ({
-              id: target.referenceId || `target-${index}`,
+              id: target.referenceId || `target-${Date.now()}-${index}`,
               name: target.name,
               skills: target.skills.map((skill: any) => skill.name),
               home_location: {
@@ -256,6 +269,11 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     setSelectedTaskIds(newSet);
   };
 
+    const handleDeleteSelectedTasks = () => {
+    setTasks(prevTasks => prevTasks.filter(task => !selectedTaskIds.has(task.id)));
+    setSelectedTaskIds(new Set());
+  };
+
   const handleSelectTarget = (targetId: string, checked: boolean) => {
     const newSet = new Set(selectedTargetIds);
     if (checked) {
@@ -265,6 +283,24 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     }
     setSelectedTargetIds(newSet);
   };
+    const handleSaveTarget = (updatedTarget: Target) => {
+    if (updatedTarget.id.startsWith('new-')) {
+       setTargets(prev => [...prev, { ...updatedTarget, id: `target-${Date.now()}` }]);
+    } else {
+       setTargets(prev => prev.map(t => t.id === updatedTarget.id ? updatedTarget : t));
+    }
+    setEditingTarget(null);
+  };
+
+  const handleSaveTask = (updatedTask: Task) => {
+    if (updatedTask.id === 'new') {
+        setTasks(prev => [...prev, { ...updatedTask, id: `task-${Date.now()}` }]);
+    } else {
+        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+    }
+    setEditingTask(null);
+  };
+
 
   const sortedTasks = React.useMemo(() => {
     let sortableItems = [...tasks];
@@ -302,20 +338,22 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
   );
   
   const doesScheduleFit = (schedule: GeneratedSchedule) => {
+    let allFit = true;
     for (const date in schedule) {
       for (const targetSchedule of schedule[date]) {
         const target = targets.find(t => t.id === targetSchedule.targetId);
         if (!target || !target.schedules || target.schedules.length === 0) continue;
+        
         const [startHour, startMinute] = target.schedules[0].dayStarts.split(':').map(Number);
         const [endHour, endMinute] = target.schedules[0].dayEnds.split(':').map(Number);
         const workingDayMinutes = (endHour - startHour) * 60 + (endMinute - startMinute);
 
         if (targetSchedule.totalDuration + targetSchedule.totalTravelTime > workingDayMinutes) {
-          return false;
+          allFit = false;
         }
       }
     }
-    return true;
+    return allFit;
   }
 
   const handleGenerateSchedule = (extendDay = false, force = false) => {
@@ -352,28 +390,37 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
         let allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
         
         originalTasksToSchedule.forEach(task => {
-          if (task.startTime && isWithinInterval(task.startTime, { start: today, end: endDay })) {
-            allTaskOccurrences.push({ 
-                ...task, 
-                originalId: task.id, 
-                id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, 
-                occurrenceDate: task.startTime
-            });
-          }
-          if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
-              let currentDate = addDays(task.startTime, task.repeatInterval);
-               while (currentDate <= endDay) {
-                  if (isWithinInterval(currentDate, { start: today, end: endDay })) {
-                       allTaskOccurrences.push({ 
-                          ...task, 
-                          originalId: task.id, 
-                          id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
-                          occurrenceDate: currentDate 
-                      });
-                  }
-                  currentDate = addDays(currentDate, task.repeatInterval);
-              }
-          }
+            if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
+                let currentDate = task.startTime;
+                while (currentDate <= endDay) {
+                    if (currentDate >= today) {
+                        allTaskOccurrences.push({ 
+                            ...task, 
+                            originalId: task.id, 
+                            id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
+                            occurrenceDate: currentDate 
+                        });
+                    }
+                    currentDate = addDays(currentDate, task.repeatInterval);
+                }
+            } else if (task.startTime && isWithinInterval(task.startTime, { start: today, end: endDay })) {
+                allTaskOccurrences.push({ 
+                    ...task, 
+                    originalId: task.id, 
+                    id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, 
+                    occurrenceDate: task.startTime
+                });
+            } else if (!task.startTime) {
+                // For tasks without a start time, assume they can be scheduled on any day in the range
+                datesToSchedule.forEach(currentDate => {
+                    allTaskOccurrences.push({
+                         ...task, 
+                        originalId: task.id, 
+                        id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
+                        occurrenceDate: currentDate 
+                    })
+                });
+            }
         });
 
 
@@ -402,10 +449,15 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 
                 const route: TargetSchedule['route'] = [];
 
-
-                const tempTasks = Array.from(tasksToScheduleThisDay);
+                // Simple greedy approach: sort tasks by priority or name and schedule them
+                const tempTasks = Array.from(tasksToScheduleThisDay).sort((a,b) => a.name.localeCompare(b.name));
 
                 for (const task of tempTasks) {
+                    // Check if target has required skills
+                    if (task.skills && task.skills.length > 0 && !task.skills.every(skill => target.skills.includes(skill))) {
+                        continue;
+                    }
+
                     const distance = getDistance(lastLocation.lat, lastLocation.lng, task.location.lat, task.location.lng);
                     const travelTime = Math.round((distance / vehicleSpeed) * 60); // in minutes
 
@@ -431,7 +483,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                         totalTravelTime += travelTime;
                         currentTime = taskEndTime;
                         lastLocation = task.location;
-                        tasksToScheduleThisDay.delete(task);
+                        tasksToScheduleThisDay.delete(task); // Remove from pool for this day
                     }
                 }
                 
@@ -444,8 +496,12 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 });
             });
         });
+        
+      const allScheduledIds = new Set(Object.values(schedule).flat().flatMap(ts => ts.schedule.map(e => e.taskId.split('-202')[0])));
+      const allSelectedOriginalIds = new Set(originalTasksToSchedule.map(t => t.id));
+      const hasUnscheduledTasks = ![...allSelectedOriginalIds].every(id => allScheduledIds.has(id));
 
-      if (!force && !doesScheduleFit(schedule)) {
+      if (!force && hasUnscheduledTasks) {
         setShowExtendDayDialog(true);
         setIsLoading(false);
         return;
@@ -543,7 +599,9 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
           if (originalTask?.originalId) {
             ids.add(originalTask.originalId);
           } else {
-            ids.add(entry.taskId);
+            // Fallback for tasks that might not be in allTasksForSchedule
+            const baseId = entry.taskId.split('-202')[0]; // Attempt to get original ID
+            ids.add(baseId);
           }
         });
       });
@@ -573,6 +631,32 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+        {editingTarget && (
+        <EditTargetDialog
+          target={editingTarget}
+          onSave={handleSaveTarget}
+          onClose={() => setEditingTarget(null)}
+          onDelete={(id) => {
+            setTargets(prev => prev.filter(t => t.id !== id));
+            setEditingTarget(null);
+          }}
+        />
+      )}
+      {editingTask && (
+        <EditTaskDialog
+          task={editingTask === 'new' ? {
+              id: 'new',
+              name: '',
+              location: { address: '', lat: 0, lng: 0 },
+              duration: 60,
+              type: 'maintenance',
+              priority: 'medium',
+              skills: [],
+          } : editingTask}
+          onSave={handleSaveTask}
+          onClose={() => setEditingTask(null)}
+        />
+      )}
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
         <div className="flex items-center gap-2">
           <Waypoints className="h-6 w-6 text-primary" />
@@ -619,167 +703,179 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="setup">
-            <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-3">
-              <Card className="lg:col-span-1">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users /> Targets
-                  </CardTitle>
-                  <CardDescription>
-                    Select the targets (workers) to include in the schedule.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-                  {targets.map((target) => (
-                    <div
-                      key={target.id}
-                      className="flex items-start space-x-4 rounded-md border p-4"
-                    >
-                      <Checkbox
-                        id={`target-${target.id}`}
-                        checked={selectedTargetIds.has(target.id)}
-                        onCheckedChange={(checked) =>
-                          handleSelectTarget(target.id, !!checked)
-                        }
-                        className="mt-1"
-                      />
-                      <Avatar>
-                        <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
-                        <AvatarFallback>
-                          {target.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {target.name}
-                        </p>
-                        {target.skills && target.skills.length > 0 && (
-                            <p className="text-sm text-muted-foreground">
-                            Skills: {target.skills.join(", ")}
-                            </p>
-                        )}
-                         {target.schedules && target.schedules.length > 0 && (
-                          <div className="text-sm text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            <span>
-                              {target.schedules[0].dayStarts} - {target.schedules[0].dayEnds}
-                            </span>
-                          </div>
-                        )}
+            <ResizablePanelGroup direction="horizontal" className="w-full rounded-lg border">
+              <ResizablePanel defaultSize={30}>
+                <Card className="h-full border-0">
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Users /> Targets
+                        </CardTitle>
+                        <CardDescription>
+                          Select workers for the schedule.
+                        </CardDescription>
                       </div>
+                       <Button size="sm" onClick={() => setEditingTarget({ id: `new-${Date.now()}`, name: '', skills: [], home_location: { lat: 0, lng: 0 }, schedules: [{dayStarts: '08:00', dayEnds: '16:00', validFrom: '', validTo: ''}] })}>
+                          Add Target
+                        </Button>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="lg:col-span-2">
-                <CardHeader className="flex flex-row items-center">
-                  <div className="grid gap-2">
-                    <CardTitle className="flex items-center gap-2">
-                      <ListTodo />
-                      Tasks
-                    </CardTitle>
-                    <CardDescription>
-                      Select tasks to be scheduled.
-                    </CardDescription>
-                  </div>
-                  <div className="ml-auto flex items-center gap-2">
-                    <Input
-                      placeholder="Filter tasks..."
-                      value={filter}
-                      onChange={(e) => setFilter(e.target.value)}
-                      className="max-w-xs"
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[40px]">
-                          <Checkbox
-                            checked={
-                              selectedTaskIds.size > 0 &&
-                              selectedTaskIds.size === filteredTasks.length &&
-                              filteredTasks.length > 0
-                            }
-                            onCheckedChange={(checked) =>
-                              handleSelectAllTasks(!!checked)
-                            }
-                          />
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            onClick={() => requestSort("name")}
-                          >
-                            Task Name
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>
-                          <Button
-                            variant="ghost"
-                            onClick={() => requestSort("type")}
-                          >
-                            Type
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                        <TableHead>Address</TableHead>
-                        <TableHead>Start Time</TableHead>
-                        <TableHead>End Time</TableHead>
-                        <TableHead className="text-right">
-                          <Button
-                            variant="ghost"
-                            onClick={() => requestSort("duration")}
-                          >
-                            Duration (min)
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTasks.map((task) => {
-                        const isScheduled = generatedSchedule && scheduledTaskIds.has(task.id);
-                        const isUnscheduled = generatedSchedule && !scheduledTaskIds.has(task.id);
-                        return(
-                        <TableRow key={task.id} className={cn(isUnscheduled && "line-through opacity-50")}>
-                          <TableCell>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    {targets.map((target) => (
+                      <div
+                        key={target.id}
+                        className="flex items-start space-x-4 rounded-md border p-4"
+                      >
+                        <Checkbox
+                          id={`target-${target.id}`}
+                          checked={selectedTargetIds.has(target.id)}
+                          onCheckedChange={(checked) =>
+                            handleSelectTarget(target.id, !!checked)
+                          }
+                          className="mt-1"
+                        />
+                        <Avatar>
+                          <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
+                          <AvatarFallback>
+                            {target.name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium leading-none">
+                            {target.name}
+                          </p>
+                          {target.skills && target.skills.length > 0 && (
+                              <p className="text-sm text-muted-foreground">
+                              Skills: {target.skills.join(", ")}
+                              </p>
+                          )}
+                          {target.schedules && target.schedules.length > 0 && (
+                            <div className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {target.schedules[0].dayStarts} - {target.schedules[0].dayEnds}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingTarget(target)}>
+                            <Pencil className="h-4 w-4" />
+                         </Button>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={70}>
+                <Card className="h-full border-0">
+                  <CardHeader className="flex flex-row items-center">
+                    <div className="grid gap-2">
+                      <CardTitle className="flex items-center gap-2">
+                        <ListTodo />
+                        Tasks
+                      </CardTitle>
+                      <CardDescription>
+                        Select tasks to be scheduled.
+                      </CardDescription>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                       {selectedTaskIds.size > 0 && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleDeleteSelectedTasks}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Selected ({selectedTaskIds.size})
+                        </Button>
+                      )}
+                      <Button size="sm" onClick={() => setEditingTask("new")}>Add Task</Button>
+                      <Input
+                        placeholder="Filter tasks..."
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value)}
+                        className="max-w-xs"
+                      />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[40px]">
                             <Checkbox
-                              checked={selectedTaskIds.has(task.id)}
+                              checked={
+                                selectedTaskIds.size > 0 &&
+                                selectedTaskIds.size === filteredTasks.length &&
+                                filteredTasks.length > 0
+                              }
                               onCheckedChange={(checked) =>
-                                handleSelectTask(task.id, !!checked)
+                                handleSelectAllTasks(!!checked)
                               }
                             />
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {task.name}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className="flex items-center gap-2"
+                          </TableHead>
+                          <TableHead>
+                            <Button
+                              variant="ghost"
+                              onClick={() => requestSort("name")}
                             >
-                              {taskTypeIcons[task.type]}
-                              <span className="capitalize">{task.type}</span>
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{task.location.address}</TableCell>
-                           <TableCell>{task.startTime ? format(task.startTime, 'p') : 'N/A'}</TableCell>
-                          <TableCell>{task.endTime ? format(task.endTime, 'p') : 'N/A'}</TableCell>
-                          <TableCell className="text-right">
-                            {task.duration}
-                          </TableCell>
+                              Task Name
+                              <ArrowUpDown className="ml-2 h-4 w-4" />
+                            </Button>
+                          </TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Address</TableHead>
+                          <TableHead>Segment</TableHead>
+                          <TableHead>Skills</TableHead>
+                          <TableHead>Duration</TableHead>
+                          <TableHead className="w-[80px]">Actions</TableHead>
                         </TableRow>
-                      )})}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
-            </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTasks.map((task) => {
+                          const isScheduled = generatedSchedule && scheduledTaskIds.has(task.id);
+                          const isUnscheduled = generatedSchedule && !isScheduled && selectedTaskIds.has(task.id);
+                          return(
+                          <TableRow key={task.id} className={cn(isUnscheduled && "line-through opacity-50")}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedTaskIds.has(task.id)}
+                                onCheckedChange={(checked) =>
+                                  handleSelectTask(task.id, !!checked)
+                                }
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {task.name}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className="flex items-center gap-2"
+                              >
+                                {taskTypeIcons[task.type]}
+                                <span className="capitalize">{task.type}</span>
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{task.location.address}</TableCell>
+                            <TableCell>{task.segment}</TableCell>
+                            <TableCell>{task.skills?.join(', ')}</TableCell>
+                            <TableCell>{task.duration} min</TableCell>
+                            <TableCell>
+                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingTask(task)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        )})}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </ResizablePanel>
+            </ResizablePanelGroup>
           </TabsContent>
           <TabsContent value="schedule">
             {generatedSchedule && (
