@@ -187,7 +187,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     }
   }, [setAppState]);
 
-  const { workingDayHours, vehicleSpeed, includeHomeTravel } = appState;
+  const { workingDayHours, vehicleSpeed, includeHomeTravel, useTargetPhoto } = appState;
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -977,12 +977,14 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                                     return (
                                       <div key={ts.targetId}>
                                         <div className="flex items-center gap-3 mb-2">
-                                          <Avatar>
-                                            <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
-                                            <AvatarFallback>
-                                              {target.name.charAt(0)}
-                                            </AvatarFallback>
-                                          </Avatar>
+                                          {useTargetPhoto && (
+                                            <Avatar>
+                                              <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
+                                              <AvatarFallback>
+                                                {target.name.charAt(0)}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          )}
                                           <h4 className="font-medium">{target.name}</h4>
                                         </div>
                                         <div className="relative h-8 w-full rounded-lg bg-secondary">

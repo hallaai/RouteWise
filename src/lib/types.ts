@@ -68,6 +68,7 @@ export interface AppState {
     start: boolean;
     end: boolean;
   };
+  useTargetPhoto: boolean;
 }
 
     

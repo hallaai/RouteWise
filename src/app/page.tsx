@@ -12,7 +12,8 @@ export default function Home() {
     includeHomeTravel: {
       start: true,
       end: true,
-    }
+    },
+    useTargetPhoto: false,
   });
 
   return (

@@ -11,7 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import type { AppState } from '@/lib/types';
+import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -30,6 +32,7 @@ export default function SettingsPage() {
             start: true,
             end: true,
         },
+        useTargetPhoto: false,
       });
     }
   }, []);
@@ -63,6 +66,15 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSwitchChange = (id: 'useTargetPhoto', checked: boolean) => {
+    if (appState) {
+        setAppState(prevState => ({
+            ...prevState!,
+            [id]: checked,
+        }));
+    }
+  };
+
   if (!appState) {
     return <div>Loading...</div>;
   }
@@ -86,39 +98,39 @@ export default function SettingsPage() {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                 <Settings />
-                Scheduling Options
+                Scheduling and Display Options
                 </CardTitle>
                 <CardDescription>
-                Adjust parameters for the scheduling algorithm.
+                Adjust parameters for the scheduling algorithm and UI.
                 </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-6">
                 <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="workingDayHours">
-                    Extend working day by (hours)
-                    </Label>
-                    <Input
-                        id="workingDayHours"
+                    <div className="grid gap-2">
+                        <Label htmlFor="workingDayHours">
+                        Extend working day by (hours)
+                        </Label>
+                        <Input
+                            id="workingDayHours"
+                            type="number"
+                            value={appState.workingDayHours}
+                            onChange={handleInputChange}
+                            className="max-w-[150px]"
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="vehicleSpeed">
+                        Vehicle Speed (km/h)
+                        </Label>
+                        <Input
+                        id="vehicleSpeed"
                         type="number"
-                        value={appState.workingDayHours}
+                        value={appState.vehicleSpeed}
                         onChange={handleInputChange}
+                        max={999}
                         className="max-w-[150px]"
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="vehicleSpeed">
-                    Vehicle Speed (km/h)
-                    </Label>
-                    <Input
-                    id="vehicleSpeed"
-                    type="number"
-                    value={appState.vehicleSpeed}
-                    onChange={handleInputChange}
-                    max={999}
-                    className="max-w-[150px]"
-                    />
-                </div>
+                        />
+                    </div>
                 </div>
                  <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
@@ -148,6 +160,19 @@ export default function SettingsPage() {
                       </Label>
                     </div>
                   </div>
+                  <Separator />
+                   <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                id="useTargetPhoto"
+                                checked={appState.useTargetPhoto}
+                                onCheckedChange={(checked) => handleSwitchChange('useTargetPhoto', !!checked)}
+                            />
+                            <Label htmlFor="useTargetPhoto">
+                                Use target photos in schedule view
+                            </Label>
+                        </div>
+                    </div>
             </CardContent>
         </Card>
       </main>
