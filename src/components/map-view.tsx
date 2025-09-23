@@ -15,11 +15,6 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 
-// Import marker images from node_modules. This is the crucial part.
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
-import iconUrl from 'leaflet/dist/images/marker-icon.png';
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
-
 interface MapViewProps {
   tasks: Task[];
   scheduledTaskIds: Set<string>;
@@ -27,18 +22,6 @@ interface MapViewProps {
 }
 
 type FilterType = "all" | "scheduled" | "unscheduled";
-
-// This is the definitive fix. We must set up the icon paths *before* the component renders.
-// This runs once when the module is loaded on the client.
-if (typeof window !== 'undefined') {
-    // @ts-ignore
-    delete L.Icon.Default.prototype._getIconUrl;
-    L.Icon.Default.mergeOptions({
-        iconRetinaUrl: iconRetinaUrl.src,
-        iconUrl: iconUrl.src,
-        shadowUrl: shadowUrl.src,
-    });
-}
 
 
 export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewProps) {
@@ -66,23 +49,24 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
   }, [tasks, scheduledTaskIds, filter]);
   
   React.useEffect(() => {
-    // Initialize map only once when the component mounts
     if (mapContainerRef.current && !mapRef.current) {
-        mapRef.current = L.map(mapContainerRef.current).setView([61.498, 23.76], 10); // Default view
+        mapRef.current = L.map(mapContainerRef.current, {
+          attributionControl: false
+        }).setView([61.498, 23.76], 10);
         
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(mapRef.current);
         
-        // Initialize marker cluster group once
+        L.control.attribution({ position: 'bottomleft' }).addTo(mapRef.current);
+        
         markersRef.current = L.markerClusterGroup();
         mapRef.current.addLayer(markersRef.current);
     }
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
 
   React.useEffect(() => {
-    // This effect handles adding/updating markers when filteredTasks change.
     if (mapRef.current && markersRef.current) {
         const markerLayer = markersRef.current;
         markerLayer.clearLayers();
@@ -100,18 +84,14 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
                 const originalId = task.originalId || task.id;
                 const isHighlighted = activeTaskGroups.has(originalId);
                 
-                const customIcon = new L.Icon({
-                    iconUrl: iconUrl.src,
-                    iconRetinaUrl: iconRetinaUrl.src,
-                    shadowUrl: shadowUrl.src,
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41],
-                    className: isHighlighted ? 'leaflet-marker-highlighted' : ''
+                const circleMarker = L.circleMarker([task.location.lat, task.location.lng], {
+                    radius: 8,
+                    fillColor: isHighlighted ? "#ff9933" : "#29abe2",
+                    color: "#ffffff",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
                 });
-
-                const marker = L.marker([task.location.lat, task.location.lng], { icon: customIcon });
                 
                 const popupContent = `
                   <div style="font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6;">
@@ -122,8 +102,8 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
                     ${task.segment ? `<strong>Segment:</strong> ${task.segment}<br>` : ''}
                   </div>
                 `;
-                marker.bindPopup(popupContent);
-                markerLayer.addLayer(marker);
+                circleMarker.bindPopup(popupContent);
+                markerLayer.addLayer(circleMarker);
             });
 
             if (mapRef.current && bounds.isValid()) {
@@ -136,13 +116,6 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
 
   return (
     <Card>
-      <style>
-        {`
-          .leaflet-marker-highlighted {
-            filter: hue-rotate(170deg) brightness(1.2) saturate(2);
-          }
-        `}
-      </style>
       <CardHeader className="flex flex-row justify-between items-center">
         <CardTitle>Route Map</CardTitle>
          <RadioGroup value={filter} onValueChange={(value: FilterType) => setFilter(value)} className="flex items-center space-x-4">
