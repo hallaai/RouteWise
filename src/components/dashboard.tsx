@@ -19,7 +19,7 @@ import {
   Upload,
   Clock,
 } from "lucide-react";
-import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO } from "date-fns";
+import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse } from "date-fns";
 import type { DateRange } from "react-day-picker";
 
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +61,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { mockTasks, mockTargets } from "@/lib/data";
 import type { Task, Target, GeneratedSchedule, TaskType } from "@/lib/types";
 import { MapView } from "./map-view";
 import { cn } from "@/lib/utils";
@@ -85,6 +84,7 @@ const taskTypeIcons: Record<TaskType, JSX.Element> = {
 // Function to generate a color from a string
 const stringToColor = (str: string) => {
   let hash = 0;
+  if (!str) return '#29ABE2';
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
@@ -290,74 +290,72 @@ export function Dashboard() {
         "The AI is optimizing tasks and routes. This may take a moment.",
     });
 
-    // Mock AI processing time
     setTimeout(() => {
-      // Mock schedule generation for 7 days
       const schedule: GeneratedSchedule = {};
-      const tasksToSchedule = Array.from(selectedTaskIds);
-      const targetsForScheduling = Array.from(selectedTargetIds);
+      const tasksToSchedule = new Set(selectedTaskIds);
+      const targetsForScheduling = Array.from(selectedTargetIds)
+        .map(id => targets.find(t => t.id === id))
+        .filter((t): t is Target => !!t);
       
       const today = dateRange?.from || startOfDay(new Date());
       const endDay = dateRange?.to || addDays(today, 6);
       const datesToSchedule = eachDayOfInterval({start: today, end: endDay});
 
-
       datesToSchedule.forEach(currentDate => {
         const dateStr = format(currentDate, "yyyy-MM-dd");
         schedule[dateStr] = [];
 
-        // Distribute tasks among targets for the current day
-        const tasksForThisDay = tasksToSchedule.filter(taskId => {
+        targetsForScheduling.forEach(target => {
+          const targetSchedule = target.schedules?.[0];
+          if (!targetSchedule) return;
+
+          const [startHour, startMinute] = targetSchedule.dayStarts.split(':').map(Number);
+          
+          let currentTime = setSeconds(setMinutes(setHours(currentDate, startHour), startMinute), 0);
+
+          const scheduledEntries = [];
+          let totalDuration = 0;
+          let totalTravelTime = 0;
+
+          const tempTasks = Array.from(tasksToSchedule);
+          for(const taskId of tempTasks) {
             const task = tasks.find(t => t.id === taskId);
-            if (!task?.startTime) return true; // If no start time, can be scheduled any day
-            return format(task.startTime, 'yyyy-MM-dd') === dateStr;
-        });
+            if (!task) continue;
 
-        const tasksPerTarget = Math.ceil(tasksForThisDay.length / targetsForScheduling.length);
+            const taskStartTime = task.startTime ? task.startTime : currentTime;
 
-        targetsForScheduling.forEach((targetId, targetIndex) => {
-            const targetTasks = tasksForThisDay.slice(
-                targetIndex * tasksPerTarget,
-                (targetIndex + 1) * tasksPerTarget
-            );
+            if (taskStartTime >= currentTime) {
+              const travelTime = 15; // mock travel time
+              const taskEndTime = addMinutes(taskStartTime, task.duration);
+              
+              const targetDayEnds = parse(targetSchedule.dayEnds, 'HH:mm', new Date());
+              const endOfDay = setSeconds(setMinutes(setHours(currentDate, targetDayEnds.getHours()), targetDayEnds.getMinutes()), 0);
 
-            let currentTime = startOfDay(currentDate);
-            const scheduledEntries = [];
-            let totalDuration = 0;
-            let totalTravelTime = 0;
-
-            for (const taskId of targetTasks) {
-                const task = tasks.find(t => t.id === taskId);
-                if (!task) continue;
-
-                const startTime = currentTime;
-                const endTime = addMinutes(startTime, task.duration);
-                
+              if(taskEndTime <= endOfDay) {
                 scheduledEntries.push({
                     taskId: taskId,
-                    startTime: startTime.toISOString(),
-                    endTime: endTime.toISOString(),
+                    startTime: taskStartTime.toISOString(),
+                    endTime: taskEndTime.toISOString(),
                 });
                 
                 totalDuration += task.duration;
-                
-                // Add travel time for subsequent tasks
-                if (scheduledEntries.length > 1) {
-                    totalTravelTime += 15;
-                }
-                currentTime = addMinutes(endTime, 15); // Task duration + travel time
+                totalTravelTime += travelTime;
+                currentTime = addMinutes(taskEndTime, travelTime);
+                tasksToSchedule.delete(taskId);
+              }
             }
+          }
 
-            schedule[dateStr].push({
-                targetId: targetId,
-                schedule: scheduledEntries,
-                route: [],
-                totalDuration: totalDuration,
-                totalTravelTime: totalTravelTime
-            });
+          schedule[dateStr].push({
+              targetId: target.id,
+              schedule: scheduledEntries,
+              route: [],
+              totalDuration: totalDuration,
+              totalTravelTime: totalTravelTime
+          });
         });
       });
-      
+
       if (!extendDay && !doesScheduleFit(schedule)) {
         setShowExtendDayDialog(true);
         setIsLoading(false);
@@ -793,7 +791,7 @@ export function Dashboard() {
 
                                           const left = (startOffsetMinutes / workingDayMinutes) * 100;
                                           const width = (durationMinutes / workingDayMinutes) * 100;
-                                          const segmentColor = task.segment ? stringToColor(task.segment) : '#29ABE2';
+                                          const segmentColor = stringToColor(task.segment);
 
 
                                           return (
@@ -845,5 +843,7 @@ export function Dashboard() {
     </div>
   );
 }
+
+    
 
     

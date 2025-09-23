@@ -56,3 +56,5 @@ export interface TargetSchedule {
 export interface GeneratedSchedule {
   [date: string]: TargetSchedule[];
 }
+
+    
