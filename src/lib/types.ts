@@ -1,5 +1,4 @@
 
-
 export type TaskType = 'pickup' | 'delivery' | 'maintenance' | 'installation' | 'cleaning';
 
 export interface Task {
@@ -13,6 +12,7 @@ export interface Task {
   duration: number; // in minutes
   type: TaskType;
   priority: 'low' | 'medium' | 'high';
+  skills: string[];
   segment?: string;
   startTime?: Date;
   endTime?: Date;
@@ -35,7 +35,7 @@ export interface Target {
     lat: number;
     lng: number;
   };
-  avatarUrl: string;
+  avatarUrl?: string;
   schedules?: TargetScheduleInfo[];
 }
 
@@ -69,3 +69,5 @@ export interface AppState {
     end: boolean;
   };
 }
+
+    

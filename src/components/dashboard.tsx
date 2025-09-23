@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   ArrowUpDown,
   Calendar as CalendarIcon,
+  CheckCircle2,
   ChevronDown,
   Home,
   ListTodo,
@@ -13,16 +14,16 @@ import {
   Package,
   Settings,
   SlidersHorizontal,
+  Trash2,
   Truck,
   Users,
   Waypoints,
   Wrench,
   Upload,
   Clock,
-  Trash2,
   Pencil,
 } from "lucide-react";
-import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, parse, differenceInMinutes, isBefore, isWithinInterval, add } from "date-fns";
+import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, isWithinInterval } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import dynamic from 'next/dynamic';
 
@@ -217,7 +218,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
             const newTargets: Target[] = data.targets.map((target: any, index: number) => ({
               id: target.referenceId || `target-${Date.now()}-${index}`,
               name: target.name,
-              skills: target.skills.map((skill: any) => skill.name),
+              skills: target.skills.map((skill: any) => typeof skill === 'object' && skill !== null ? skill.name : skill),
               home_location: {
                 lat: target.coordinates.lat,
                 lng: target.coordinates.lon,
@@ -442,9 +443,9 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     let arrivalTime = addMinutes(currentTime, travelTime);
                     let taskStartTime = arrivalTime;
                     
-                    const specificStartTimeOnDate = task.startTime ? setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0) : null;
-                    if (specificStartTimeOnDate && isBefore(taskStartTime, specificStartTimeOnDate)) {
-                        taskStartTime = specificStartTimeOnDate;
+                    const specificStartTime = task.startTime ? setSeconds(setMinutes(setHours(task.startTime, task.startTime.getHours()), task.startTime.getMinutes()), 0) : null;
+                    if (specificStartTime && taskStartTime < specificStartTime) {
+                        taskStartTime = specificStartTime;
                     }
                     
                     const taskEndTime = addMinutes(taskStartTime, task.duration);
@@ -824,7 +825,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                           const isScheduled = generatedSchedule && scheduledTaskIds.has(task.id);
                           const isUnscheduled = generatedSchedule && !isScheduled && selectedTaskIds.has(task.id);
                           return(
-                          <TableRow key={task.id} className={cn(isUnscheduled && "line-through opacity-50")}>
+                          <TableRow key={task.id} className={cn(isUnscheduled && "opacity-50")}>
                             <TableCell>
                               <Checkbox
                                 checked={selectedTaskIds.has(task.id)}
@@ -833,7 +834,20 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                                 }
                               />
                             </TableCell>
-                            <TableCell className="font-medium">
+                            <TableCell className="font-medium flex items-center gap-2">
+                              {isScheduled && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                       <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>This task is scheduled.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                               )}
+                               {isUnscheduled && <div className="w-4 h-4" />}
                               {task.name}
                             </TableCell>
                             <TableCell>
@@ -926,7 +940,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                           return (
                             <div key={dateStr}>
                               <h3 className="text-lg font-semibold mb-4">
-                                {format(new Date(dateStr), "EEEE, MMMM do, yyyy")}
+                                {format(date, "EEEE, MMMM do, yyyy")}
                               </h3>
                               <div className="space-y-8">
                                 {targetSchedules.map((ts) => {
@@ -1060,7 +1074,5 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
-
-    
 
     
