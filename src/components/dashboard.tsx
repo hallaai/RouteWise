@@ -81,10 +81,9 @@ import { EditTaskDialog } from "./edit-task-dialog";
 import { Separator } from "./ui/separator";
 import { ReportView } from "./report-view";
 
-
-const MapView = dynamic(() => import('./map-view').then(mod => mod.MapView), {
+const MapView = dynamic(() => import('./map-view').then(mod => mod.MapView), { 
   ssr: false,
-  loading: () => <p>Loading map...</p>
+  loading: () => <p>Loading map...</p> 
 });
 
 
@@ -154,10 +153,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const [generatedSchedule, setGeneratedSchedule] =
     React.useState<GeneratedSchedule | null>(null);
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
-    from: startOfDay(new Date()),
-    to: addDays(startOfDay(new Date()), 6),
-  });
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined);
   const [showExtendDayDialog, setShowExtendDayDialog] = React.useState(false);
   const [activeTaskGroups, setActiveTaskGroups] = React.useState<Set<string>>(new Set());
   const [editingTarget, setEditingTarget] = React.useState<Target | null>(null);
@@ -170,6 +166,11 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     if (savedState) {
       setAppState(JSON.parse(savedState));
     }
+     // Set initial date range on client to avoid hydration mismatch
+    setDateRange({
+        from: startOfDay(new Date()),
+        to: addDays(startOfDay(new Date()), 6),
+    });
   }, [setAppState]);
 
   const { workingDayHours, vehicleSpeed, includeHomeTravel, useTargetPhoto } = appState;
@@ -1100,3 +1101,5 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     
 
     
+
+
