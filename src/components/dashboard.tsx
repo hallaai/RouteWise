@@ -929,13 +929,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 </div>
                 <TabsContent value="daily">
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Schedule</CardTitle>
-                      <CardDescription>
-                        Visual timeline of tasks for each target for the selected period.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-4 pt-6">
                       {displayedDates.map((date, dateIndex) => {
                           const dateStr = format(date, "yyyy-MM-dd");
                           const targetSchedules = generatedSchedule[dateStr] || [];
