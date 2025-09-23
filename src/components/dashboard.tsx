@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -16,6 +17,7 @@ import {
   Waypoints,
   Wrench,
   Upload,
+  Clock,
 } from "lucide-react";
 import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -168,6 +170,7 @@ export function Dashboard() {
                 lng: target.coordinates.lon,
               },
               avatarUrl: `https://picsum.photos/seed/${index+1}/200/200`, // Placeholder avatar
+              schedules: target.schedules,
             }));
             
             setTasks(newTasks);
@@ -464,7 +467,7 @@ export function Dashboard() {
                   {targets.map((target) => (
                     <div
                       key={target.id}
-                      className="flex items-center space-x-4 rounded-md border p-4"
+                      className="flex items-start space-x-4 rounded-md border p-4"
                     >
                       <Checkbox
                         id={`target-${target.id}`}
@@ -472,6 +475,7 @@ export function Dashboard() {
                         onCheckedChange={(checked) =>
                           handleSelectTarget(target.id, !!checked)
                         }
+                        className="mt-1"
                       />
                       <Avatar>
                         <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
@@ -483,9 +487,19 @@ export function Dashboard() {
                         <p className="text-sm font-medium leading-none">
                           {target.name}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          Skills: {target.skills.join(", ")}
-                        </p>
+                        {target.skills && target.skills.length > 0 && (
+                            <p className="text-sm text-muted-foreground">
+                            Skills: {target.skills.join(", ")}
+                            </p>
+                        )}
+                         {target.schedules && target.schedules.length > 0 && (
+                          <div className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              {target.schedules[0].dayStarts} - {target.schedules[0].dayEnds}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

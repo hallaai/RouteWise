@@ -17,6 +17,13 @@ export interface Task {
   endTime?: Date;
 }
 
+export interface TargetScheduleInfo {
+  dayStarts: string;
+  dayEnds: string;
+  validFrom: string;
+  validTo: string;
+}
+
 export interface Target {
   id: string;
   name: string;
@@ -26,6 +33,7 @@ export interface Target {
     lng: number;
   };
   avatarUrl: string;
+  schedules?: TargetScheduleInfo[];
 }
 
 export interface ScheduleEntry {
