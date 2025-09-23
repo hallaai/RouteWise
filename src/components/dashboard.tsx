@@ -1,12 +1,10 @@
-
 "use client";
 
 import * as React from "react";
 import {
   ArrowUpDown,
-  Calendar,
+  Calendar as CalendarIcon,
   ChevronDown,
-  Clock,
   Home,
   ListTodo,
   Map,
@@ -18,8 +16,8 @@ import {
   Waypoints,
   Wrench,
 } from "lucide-react";
-import { format, addMinutes, startOfDay } from "date-fns";
-import Image from "next/image";
+import { format, addMinutes, startOfDay, addDays, eachDayOfInterval } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,14 +29,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -57,12 +47,24 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { mockTasks, mockTargets } from "@/lib/data";
 import type { Task, Target, GeneratedSchedule } from "@/lib/types";
 import { MapView } from "./map-view";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Calendar } from "./ui/calendar";
 
 type SortConfig = {
   key: keyof Task;
@@ -75,12 +77,6 @@ const taskTypeIcons = {
   maintenance: <Wrench className="h-4 w-4" />,
   installation: <Settings className="h-4 w-4" />,
 };
-
-const taskPriorityBadge = {
-  low: "default",
-  medium: "secondary",
-  high: "destructive",
-} as const;
 
 export function Dashboard() {
   const { toast } = useToast();
@@ -102,6 +98,11 @@ export function Dashboard() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [generatedSchedule, setGeneratedSchedule] =
     React.useState<GeneratedSchedule | null>(null);
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>({
+    from: startOfDay(new Date()),
+    to: addDays(startOfDay(new Date()), 6),
+  });
+  const [showExtendDayDialog, setShowExtendDayDialog] = React.useState(false);
 
   const handleSelectAllTasks = (checked: boolean) => {
     if (checked) {
@@ -165,8 +166,20 @@ export function Dashboard() {
       task.location.address.toLowerCase().includes(filter.toLowerCase()) ||
       task.type.toLowerCase().includes(filter.toLowerCase())
   );
+  
+  const doesScheduleFit = (schedule: GeneratedSchedule) => {
+    const workingDayMinutes = workingDayHours[0] * 60;
+    for (const date in schedule) {
+      for (const targetSchedule of schedule[date]) {
+        if (targetSchedule.totalDuration + targetSchedule.totalTravelTime > workingDayMinutes) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
-  const handleGenerateSchedule = () => {
+  const handleGenerateSchedule = (extendDay = false) => {
     if (selectedTaskIds.size === 0 || selectedTargetIds.size === 0) {
       toast({
         title: "Selection required",
@@ -184,49 +197,116 @@ export function Dashboard() {
 
     // Mock AI processing time
     setTimeout(() => {
-      // Mock schedule generation based on selected items
+      // Mock schedule generation for 7 days
+      const schedule: GeneratedSchedule = {};
+      const tasksToSchedule = Array.from(selectedTaskIds);
+      const targetsForScheduling = Array.from(selectedTargetIds);
+      const tasksPerTarget = Math.ceil(tasksToSchedule.length / targetsForScheduling.length);
+
       const today = startOfDay(new Date());
-      const todayStr = format(today, "yyyy-MM-dd");
-      const schedule: GeneratedSchedule = {
-        [todayStr]: Array.from(selectedTargetIds).map((targetId, index) => {
-          const targetTasks = Array.from(selectedTaskIds).filter(
-            (_, i) => i % selectedTargetIds.size === index
-          );
-          let currentTime = today;
-          return {
-            targetId: targetId,
-            schedule: targetTasks.map((taskId) => {
-              const task = tasks.find((t) => t.id === taskId)!;
-              const startTime = currentTime;
-              const endTime = addMinutes(startTime, task.duration);
-              currentTime = addMinutes(endTime, 15); // Add travel time
-              return {
-                taskId: taskId,
-                startTime: startTime.toISOString(),
-                endTime: endTime.toISOString(),
-              };
-            }),
-            route: [],
-            totalDuration: targetTasks.reduce(
-              (acc, taskId) =>
-                acc + (tasks.find((t) => t.id === taskId)?.duration || 0),
-              0
-            ),
-            totalTravelTime: (targetTasks.length - 1) * 15,
-          };
-        }),
-      };
+
+      for (let day = 0; day < 7; day++) {
+        const currentDate = addDays(today, day);
+        const dateStr = format(currentDate, "yyyy-MM-dd");
+        schedule[dateStr] = [];
+
+        targetsForScheduling.forEach((targetId, targetIndex) => {
+            const targetTasks = tasksToSchedule.slice(
+                targetIndex * tasksPerTarget,
+                (targetIndex + 1) * tasksPerTarget
+            );
+
+            let currentTime = startOfDay(currentDate);
+            const scheduledEntries = [];
+            let totalDuration = 0;
+            let totalTravelTime = 0;
+
+            for (const taskId of targetTasks) {
+                const task = tasks.find(t => t.id === taskId);
+                if (!task) continue;
+
+                const startTime = currentTime;
+                const endTime = addMinutes(startTime, task.duration);
+                
+                scheduledEntries.push({
+                    taskId: taskId,
+                    startTime: startTime.toISOString(),
+                    endTime: endTime.toISOString(),
+                });
+                
+                totalDuration += task.duration;
+                
+                // Add travel time for subsequent tasks
+                if (scheduledEntries.length > 1) {
+                    totalTravelTime += 15;
+                }
+                currentTime = addMinutes(endTime, 15); // Task duration + travel time
+            }
+
+            schedule[dateStr].push({
+                targetId: targetId,
+                schedule: scheduledEntries,
+                route: [],
+                totalDuration: totalDuration,
+                totalTravelTime: totalTravelTime
+            });
+        });
+      }
+      
+      if (!extendDay && !doesScheduleFit(schedule)) {
+        setShowExtendDayDialog(true);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (extendDay) {
+        let maxRequiredHours = 0;
+        for (const date in schedule) {
+            for (const ts of schedule[date]) {
+                const requiredMinutes = ts.totalDuration + ts.totalTravelTime;
+                const requiredHours = Math.ceil(requiredMinutes / 60);
+                if (requiredHours > maxRequiredHours) {
+                    maxRequiredHours = requiredHours;
+                }
+            }
+        }
+        setWorkingDayHours([Math.min(12, maxRequiredHours)]);
+      }
+
       setGeneratedSchedule(schedule);
       setIsLoading(false);
+      setShowExtendDayDialog(false);
       toast({
         title: "Schedule Generated Successfully!",
         description: "View the new schedule in the 'Schedule' tab.",
       });
     }, 2000);
   };
+  
+  const displayedDates = React.useMemo(() => {
+    if (!dateRange?.from) return [];
+    const to = dateRange.to || dateRange.from;
+    return eachDayOfInterval({ start: dateRange.from, end: to });
+  }, [dateRange]);
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
+       <AlertDialog open={showExtendDayDialog} onOpenChange={setShowExtendDayDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tasks don't fit in the working day</AlertDialogTitle>
+            <AlertDialogDescription>
+              Some tasks cannot be completed within the current working day ({workingDayHours[0]} hours). Would you like to extend the working day to fit all tasks?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleGenerateSchedule(true)}>
+              Extend Working Day
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
         <div className="flex items-center gap-2">
           <Waypoints className="h-6 w-6 text-primary" />
@@ -234,7 +314,7 @@ export function Dashboard() {
         </div>
         <div className="ml-auto flex items-center gap-2">
           <Button
-            onClick={handleGenerateSchedule}
+            onClick={() => handleGenerateSchedule(false)}
             disabled={isLoading}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
@@ -250,7 +330,7 @@ export function Dashboard() {
               Setup
             </TabsTrigger>
             <TabsTrigger value="schedule" disabled={!generatedSchedule}>
-              <Calendar className="mr-2 h-4 w-4" />
+              <CalendarIcon className="mr-2 h-4 w-4" />
               Schedule
             </TabsTrigger>
           </TabsList>
@@ -467,90 +547,136 @@ export function Dashboard() {
           <TabsContent value="schedule">
             {generatedSchedule && (
               <Tabs defaultValue="daily" className="mt-4">
-                <TabsList>
-                  <TabsTrigger value="daily">Daily View</TabsTrigger>
-                  <TabsTrigger value="map">Map View</TabsTrigger>
-                </TabsList>
+                <div className="flex justify-between items-center">
+                  <TabsList>
+                    <TabsTrigger value="daily">Schedule View</TabsTrigger>
+                    <TabsTrigger value="map">Map View</TabsTrigger>
+                  </TabsList>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                          "w-[300px] justify-start text-left font-normal",
+                          !dateRange && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (
+                          dateRange.to ? (
+                            <>
+                              {format(dateRange.from, "LLL dd, y")} -{" "}
+                              {format(dateRange.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(dateRange.from, "LLL dd, y")
+                          )
+                        ) : (
+                          <span>Pick a date range</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 <TabsContent value="daily">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Daily Schedule</CardTitle>
+                      <CardTitle>Schedule</CardTitle>
                       <CardDescription>
-                        Visual timeline of tasks for each target.
+                        Visual timeline of tasks for each target for the selected period.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                      {Object.entries(generatedSchedule).map(
-                        ([date, targetSchedules]) => (
-                          <div key={date}>
-                            <h3 className="text-lg font-semibold mb-4">
-                              {format(new Date(date), "EEEE, MMMM do, yyyy")}
-                            </h3>
-                            <div className="space-y-8">
-                              {targetSchedules.map((ts) => {
-                                const target = targets.find(
-                                  (t) => t.id === ts.targetId
-                                )!;
-                                const workingDayMinutes = workingDayHours[0] * 60;
-                                
-                                return (
-                                  <div key={ts.targetId}>
-                                    <div className="flex items-center gap-3 mb-2">
-                                       <Avatar>
-                                        <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
-                                        <AvatarFallback>
-                                          {target.name.charAt(0)}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <h4 className="font-medium">{target.name}</h4>
-                                    </div>
-                                    <div className="relative h-12 w-full rounded-lg bg-secondary">
-                                      {ts.schedule.map((entry) => {
-                                        const task = tasks.find(
-                                          (t) => t.id === entry.taskId
-                                        )!;
-                                        const start = new Date(entry.startTime);
-                                        const end = new Date(entry.endTime);
-                                        const startOfDayTime = startOfDay(start);
-                                        const startOffsetMinutes = (start.getTime() - startOfDayTime.getTime()) / 60000;
-                                        
-                                        const durationMinutes = task.duration;
+                      {displayedDates.map(date => {
+                          const dateStr = format(date, "yyyy-MM-dd");
+                          const targetSchedules = generatedSchedule[dateStr] || [];
 
-                                        const left = (startOffsetMinutes / workingDayMinutes) * 100;
-                                        const width = (durationMinutes / workingDayMinutes) * 100;
+                          if(targetSchedules.every(ts => ts.schedule.length === 0)) return null;
+                          
+                          return (
+                            <div key={dateStr}>
+                              <h3 className="text-lg font-semibold mb-4">
+                                {format(new Date(dateStr), "EEEE, MMMM do, yyyy")}
+                              </h3>
+                              <div className="space-y-8">
+                                {targetSchedules.map((ts) => {
+                                  if (ts.schedule.length === 0) return null;
+                                  
+                                  const target = targets.find(
+                                    (t) => t.id === ts.targetId
+                                  )!;
+                                  const workingDayMinutes = workingDayHours[0] * 60;
+                                  
+                                  return (
+                                    <div key={ts.targetId}>
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <Avatar>
+                                          <AvatarImage src={target.avatarUrl} alt={target.name} data-ai-hint="person portrait" />
+                                          <AvatarFallback>
+                                            {target.name.charAt(0)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <h4 className="font-medium">{target.name}</h4>
+                                      </div>
+                                      <div className="relative h-12 w-full rounded-lg bg-secondary">
+                                        {ts.schedule.map((entry) => {
+                                          const task = tasks.find(
+                                            (t) => t.id === entry.taskId
+                                          )!;
+                                          const start = new Date(entry.startTime);
+                                          const end = new Date(entry.endTime);
+                                          const startOfDayTime = startOfDay(start);
+                                          const startOffsetMinutes = (start.getTime() - startOfDayTime.getTime()) / 60000;
+                                          
+                                          const durationMinutes = task.duration;
 
-                                        return (
-                                          <TooltipProvider key={entry.taskId}>
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <div
-                                                  className="absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md bg-primary/80 hover:bg-primary transition-all"
-                                                  style={{
-                                                    left: `${left}%`,
-                                                    width: `${width}%`,
-                                                  }}
-                                                >
-                                                  <span className="truncate">{task.name}</span>
-                                                </div>
-                                              </TooltipTrigger>
-                                              <TooltipContent>
-                                                <p className="font-semibold">{task.name}</p>
-                                                <p>{task.location.address}</p>
-                                                <p>
-                                                  {format(start, 'p')} - {format(end, 'p')}
-                                                </p>
-                                              </TooltipContent>
-                                            </Tooltip>
-                                          </TooltipProvider>
-                                        );
-                                      })}
+                                          const left = (startOffsetMinutes / workingDayMinutes) * 100;
+                                          const width = (durationMinutes / workingDayMinutes) * 100;
+
+                                          return (
+                                            <TooltipProvider key={entry.taskId}>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <div
+                                                    className="absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md bg-primary/80 hover:bg-primary transition-all"
+                                                    style={{
+                                                      left: `${left}%`,
+                                                      width: `${width}%`,
+                                                    }}
+                                                  >
+                                                    <span className="truncate">{task.name}</span>
+                                                  </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  <p className="font-semibold">{task.name}</p>
+                                                  <p>{task.location.address}</p>
+                                                  <p>
+                                                    {format(start, 'p')} - {format(end, 'p')}
+                                                  </p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          );
+                                        })}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
                             </div>
-                          </div>
-                        )
+                          )
+                        }
                       )}
                     </CardContent>
                   </Card>
