@@ -15,7 +15,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 
-// Import marker images from node_modules
+// Import marker images from node_modules. This is the crucial part.
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
 import iconUrl from 'leaflet/dist/images/marker-icon.png';
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png';
@@ -27,6 +27,19 @@ interface MapViewProps {
 }
 
 type FilterType = "all" | "scheduled" | "unscheduled";
+
+// This is the definitive fix. We must set up the icon paths *before* the component renders.
+// This runs once when the module is loaded on the client.
+if (typeof window !== 'undefined') {
+    // @ts-ignore
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: iconRetinaUrl.src,
+        iconUrl: iconUrl.src,
+        shadowUrl: shadowUrl.src,
+    });
+}
+
 
 export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewProps) {
   const [filter, setFilter] = React.useState<FilterType>("all");
@@ -53,19 +66,7 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
   }, [tasks, scheduledTaskIds, filter]);
   
   React.useEffect(() => {
-    // This code runs only on the client.
-    // Set up Leaflet icon paths only once
-    if (typeof window !== 'undefined') {
-        // @ts-ignore
-        delete L.Icon.Default.prototype._getIconUrl;
-        L.Icon.Default.mergeOptions({
-            iconRetinaUrl: iconRetinaUrl.src,
-            iconUrl: iconUrl.src,
-            shadowUrl: shadowUrl.src
-        });
-    }
-
-    // Initialize map only once
+    // Initialize map only once when the component mounts
     if (mapContainerRef.current && !mapRef.current) {
         mapRef.current = L.map(mapContainerRef.current).setView([61.498, 23.76], 10); // Default view
         
@@ -73,6 +74,7 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(mapRef.current);
         
+        // Initialize marker cluster group once
         markersRef.current = L.markerClusterGroup();
         mapRef.current.addLayer(markersRef.current);
     }
@@ -80,9 +82,10 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
 
 
   React.useEffect(() => {
-    // Handle markers update when filteredTasks or activeTaskGroups change
+    // This effect handles adding/updating markers when filteredTasks change.
     if (mapRef.current && markersRef.current) {
-        markersRef.current.clearLayers();
+        const markerLayer = markersRef.current;
+        markerLayer.clearLayers();
 
         const validTasks = filteredTasks.filter(task => 
             task.location && 
@@ -120,7 +123,7 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
                   </div>
                 `;
                 marker.bindPopup(popupContent);
-                markersRef.current!.addLayer(marker);
+                markerLayer.addLayer(marker);
             });
 
             if (mapRef.current && bounds.isValid()) {
@@ -163,3 +166,4 @@ export function MapView({ tasks, scheduledTaskIds, activeTaskGroups }: MapViewPr
     </Card>
   );
 }
+
