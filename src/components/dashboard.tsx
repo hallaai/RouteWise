@@ -444,17 +444,20 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     const distance = getDistance(lastLocation.lat, lastLocation.lng, task.location.lat, task.location.lng);
                     const travelTime = Math.round((distance / vehicleSpeed) * 60); // in minutes
 
-                    let arrivalTime = addMinutes(currentTime, travelTime);
+                    // Calculate earliest possible start time
+                    const arrivalTime = addMinutes(currentTime, travelTime);
                     let taskStartTime = arrivalTime;
                     
                     const specificStartTime = task.startTime ? setSeconds(setMinutes(setHours(task.startTime, task.startTime.getHours()), task.startTime.getMinutes()), 0) : null;
                     if (specificStartTime && taskStartTime < specificStartTime) {
-                        taskStartTime = specificStartTime;
+                        taskStartTime = specificStartTime; // Respect task's own start time
                     }
-                    
+
                     const taskEndTime = addMinutes(taskStartTime, task.duration);
+                    
+                    const specificEndTime = task.endTime ? setSeconds(setMinutes(setHours(task.endTime, task.endTime.getHours()), task.endTime.getMinutes()), 0) : null;
                    
-                    if (taskEndTime <= dayEndWithExtension) {
+                    if (taskEndTime <= dayEndWithExtension && (!specificEndTime || taskEndTime <= specificEndTime)) {
                         scheduledEntries.push({
                             taskId: task.id,
                             startTime: taskStartTime.toISOString(),
@@ -1289,6 +1292,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
 
     
+
 
 
 
