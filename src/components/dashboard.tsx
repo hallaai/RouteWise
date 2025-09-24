@@ -396,13 +396,18 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, 
                     occurrenceDate: task.startTime
                 });
-            } else if (!task.startTime) {
-                 allTaskOccurrences.push({ 
-                    ...task, 
-                    originalId: task.id, 
-                    id: `${task.id}-adhoc`, 
-                    occurrenceDate: today // schedule for first day if no time specified
-                });
+            } else if (!task.startTime) { // For tasks without a start time, try to schedule on each day
+                 datesToSchedule.forEach(d => {
+                   const adhocTask = allTaskOccurrences.find(t => t.originalId === task.id)
+                   if (!adhocTask) {
+                        allTaskOccurrences.push({ 
+                            ...task, 
+                            originalId: task.id, 
+                            id: `${task.id}-adhoc`, 
+                            occurrenceDate: d 
+                        });
+                   }
+                 });
             }
         });
 
@@ -448,14 +453,16 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     const arrivalTime = addMinutes(currentTime, travelTime);
                     let taskStartTime = arrivalTime;
                     
-                    const specificStartTime = task.startTime ? setSeconds(setMinutes(setHours(task.startTime, task.startTime.getHours()), task.startTime.getMinutes()), 0) : null;
-                    if (specificStartTime && taskStartTime < specificStartTime) {
-                        taskStartTime = specificStartTime; // Respect task's own start time
+                    if (task.startTime) {
+                        const specificStartTime = setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0);
+                        if (taskStartTime < specificStartTime) {
+                            taskStartTime = specificStartTime; // Respect task's own start time
+                        }
                     }
 
                     const taskEndTime = addMinutes(taskStartTime, task.duration);
                     
-                    const specificEndTime = task.endTime ? setSeconds(setMinutes(setHours(task.endTime, task.endTime.getHours()), task.endTime.getMinutes()), 0) : null;
+                    const specificEndTime = task.endTime ? setSeconds(setMinutes(setHours(currentDate, task.endTime.getHours()), task.endTime.getMinutes()), 0) : null;
                    
                     if (taskEndTime <= dayEndWithExtension && (!specificEndTime || taskEndTime <= specificEndTime)) {
                         scheduledEntries.push({
@@ -1292,6 +1299,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
 
     
+
 
 
 
