@@ -99,6 +99,11 @@ type SortConfig = {
   direction: "ascending" | "descending";
 } | null;
 
+type DeletionTarget = 
+  | { type: 'day'; date: string }
+  | { type: 'target'; date: string; targetId: string }
+  | { type: 'task'; taskId: string };
+
 const taskTypeIcons: Record<TaskType, JSX.Element> = {
   pickup: <Package className="h-4 w-4" />,
   delivery: <Truck className="h-4 w-4" />,
@@ -165,7 +170,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
   const [activeTaskGroups, setActiveTaskGroups] = React.useState<Set<string>>(new Set());
   const [editingTarget, setEditingTarget] = React.useState<Target | null>(null);
   const [editingTask, setEditingTask] = React.useState<Task | "new" | null>(null);
-  const [deletionTarget, setDeletionTarget] = React.useState<{type: 'day' | 'target'; date: string; targetId?: string} | null>(null);
+  const [deletionTarget, setDeletionTarget] = React.useState<DeletionTarget | null>(null);
 
   
   // Use state from props, but also check localStorage for client-side persistence
@@ -613,22 +618,29 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
   const handleDeleteScheduleEntries = (mode: 'single' | 'all-recurring') => {
     if (!deletionTarget || !generatedSchedule) return;
 
-    const { type, date, targetId } = deletionTarget;
     const newSchedule = { ...generatedSchedule };
-
     let taskIdsToRemove = new Set<string>();
+    let deletionDate: Date | null = null;
 
-    if (type === 'day') {
-        (newSchedule[date] || []).forEach(ts => {
+    if (deletionTarget.type === 'day') {
+        (newSchedule[deletionTarget.date] || []).forEach(ts => {
             ts.schedule.forEach(entry => taskIdsToRemove.add(entry.taskId));
         });
-    } else if (type === 'target' && targetId) {
-        const ts = (newSchedule[date] || []).find(ts => ts.targetId === targetId);
+        deletionDate = parseISO(deletionTarget.date);
+    } else if (deletionTarget.type === 'target') {
+        const ts = (newSchedule[deletionTarget.date] || []).find(ts => ts.targetId === deletionTarget.targetId);
         (ts?.schedule || []).forEach(entry => taskIdsToRemove.add(entry.taskId));
+        deletionDate = parseISO(deletionTarget.date);
+    } else if (deletionTarget.type === 'task') {
+        taskIdsToRemove.add(deletionTarget.taskId);
+        const entry = Object.values(newSchedule).flat().flatMap(ts => ts.schedule).find(e => e.taskId === deletionTarget.taskId);
+        if (entry) {
+            deletionDate = parseISO(entry.startTime);
+        }
     }
 
     // If mode is 'all-recurring', find all future occurrences as well
-    if (mode === 'all-recurring') {
+    if (mode === 'all-recurring' && deletionDate) {
         const recurringOriginalIds = new Set<string>();
         taskIdsToRemove.forEach(taskId => {
             const task = allTasksForSchedule.find(t => t.id === taskId);
@@ -638,7 +650,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
         });
 
         Object.keys(newSchedule).forEach(d => {
-            if (isAfter(parseISO(d), parseISO(date))) {
+            if (isAfter(parseISO(d), deletionDate) || format(parseISO(d), 'yyyy-MM-dd') === format(deletionDate, 'yyyy-MM-dd')) {
                  newSchedule[d].forEach(ts => {
                     ts.schedule.forEach(entry => {
                         const task = allTasksForSchedule.find(t => t.id === entry.taskId);
@@ -1203,15 +1215,22 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                                                       <span className="truncate">{task.name}</span>
                                                     </div>
                                                   </TooltipTrigger>
-                                                  <TooltipContent>
-                                                    <p className="font-semibold">{task.name}</p>
-                                                    {task.segment && <p>Segment: {task.segment}</p>}
-                                                    <p>
-                                                      {format(start, 'p')} - {format(end, 'p')}
-                                                    </p>
-                                                    {task.repeatInterval && (
-                                                      <p>Repeats every {task.repeatInterval} days</p>
-                                                    )}
+                                                  <TooltipContent className="w-64">
+                                                    <div className="space-y-2">
+                                                        <p className="font-semibold">{task.name}</p>
+                                                        {task.segment && <p>Segment: {task.segment}</p>}
+                                                        <p>
+                                                          {format(start, 'p')} - {format(end, 'p')}
+                                                        </p>
+                                                        {task.repeatInterval && (
+                                                          <p>Repeats every {task.repeatInterval} days</p>
+                                                        )}
+                                                        <Separator />
+                                                        <Button variant="destructive" size="sm" className="w-full" onClick={() => setDeletionTarget({ type: 'task', taskId: task.id })}>
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            Delete Task
+                                                        </Button>
+                                                    </div>
                                                   </TooltipContent>
                                                 </Tooltip>
                                               </TooltipProvider>
@@ -1267,4 +1286,5 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
 
     
+
 
