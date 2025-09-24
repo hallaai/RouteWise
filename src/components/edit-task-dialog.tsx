@@ -2,7 +2,8 @@
 "use client";
 
 import * as React from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus } from "lucide-react";
+import { format, parse, isValid } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,9 @@ interface EditTaskDialogProps {
 const taskTypes: TaskType[] = ['pickup', 'delivery', 'maintenance', 'installation', 'cleaning'];
 const priorities = ['low', 'medium', 'high'];
 
+// The format expected by <input type="datetime-local" />
+const DATETIME_LOCAL_FORMAT = "yyyy-MM-dd'T'HH:mm";
+
 export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
     const isNew = task === "new";
     const currentTask = isNew ? null : task;
@@ -35,6 +39,8 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
     const [skills, setSkills] = React.useState<string[]>([]);
     const [newSkill, setNewSkill] = React.useState("");
     const [repeatInterval, setRepeatInterval] = React.useState<number | undefined>();
+    const [startTime, setStartTime] = React.useState<string>("");
+    const [endTime, setEndTime] = React.useState<string>("");
 
 
   React.useEffect(() => {
@@ -49,6 +55,8 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
       setSegment(currentTask.segment);
       setSkills(currentTask.skills || []);
       setRepeatInterval(currentTask.repeatInterval);
+      setStartTime(currentTask.startTime ? format(currentTask.startTime, DATETIME_LOCAL_FORMAT) : "");
+      setEndTime(currentTask.endTime ? format(currentTask.endTime, DATETIME_LOCAL_FORMAT) : "");
     } else if (isNew) {
         // Reset for new task
         setName("");
@@ -61,12 +69,17 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
         setSegment("");
         setSkills([]);
         setRepeatInterval(undefined);
+        setStartTime("");
+        setEndTime("");
     }
   }, [task, currentTask, isNew]);
 
   if (!task) return null;
 
   const handleSave = () => {
+    const parsedStartTime = startTime ? parse(startTime, DATETIME_LOCAL_FORMAT, new Date()) : undefined;
+    const parsedEndTime = endTime ? parse(endTime, DATETIME_LOCAL_FORMAT, new Date()) : undefined;
+
     const updatedTask: Task = {
       id: currentTask?.id || 'new',
       name,
@@ -77,6 +90,8 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
       segment,
       skills,
       repeatInterval,
+      startTime: parsedStartTime && isValid(parsedStartTime) ? parsedStartTime : undefined,
+      endTime: parsedEndTime && isValid(parsedEndTime) ? parsedEndTime : undefined,
     };
     onSave(updatedTask);
   };
@@ -101,7 +116,7 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
             {isNew ? "Enter the details for the new task." : "Make changes to the task's details."}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">Name</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" />
@@ -146,6 +161,14 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
            <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="segment" className="text-right">Segment</Label>
             <Input id="segment" value={segment} onChange={(e) => setSegment(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="startTime" className="text-right">Start Time</Label>
+            <Input id="startTime" type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="col-span-3" />
+          </div>
+           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="endTime" className="text-right">End Time</Label>
+            <Input id="endTime" type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="col-span-3" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="repeatInterval" className="text-right">Repeats (days)</Label>
@@ -197,3 +220,5 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
     </Dialog>
   );
 }
+
+    
