@@ -390,20 +390,17 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
         originalTasksToSchedule.forEach(task => {
             if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
                 let currentDate = task.startTime;
-                // Ensure we start checking from the beginning of the selected range if the task's start time is before it
                 while (currentDate < today) {
                     currentDate = addDays(currentDate, task.repeatInterval);
                 }
 
                 while (currentDate <= endDay) {
-                    if (isWithinInterval(currentDate, { start: today, end: endDay })) {
-                        allTaskOccurrences.push({
-                            ...task,
-                            id: `${task.id}-${format(currentDate, 'yyyyMMdd')}`,
-                            occurrenceDate: currentDate,
-                            originalId: task.id,
-                        });
-                    }
+                     allTaskOccurrences.push({
+                        ...task,
+                        id: `${task.id}-${format(currentDate, 'yyyyMMdd')}`,
+                        occurrenceDate: currentDate,
+                        originalId: task.id,
+                    });
                     currentDate = addDays(currentDate, task.repeatInterval);
                 }
             } else {
@@ -506,59 +503,58 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 while (!done) {
                     let bestTask: Task | null = null;
                     let bestEntry: ScheduleEntry | null = null;
+                    let bestInsertionIndex = -1;
                     let minIdle = Infinity;
 
-                    const allEntries = [
-                        { endTime: dayStart.toISOString() }, 
-                        ...ts.schedule
-                    ].sort((a,b) => parseISO(a.endTime).getTime() - parseISO(b.endTime).getTime());
+                    const schedulableTasksForTarget = Array.from(dailyTasksForDay).filter(task => 
+                        task.skills.every(skill => target.skills.includes(skill))
+                    );
 
-                    for (const task of Array.from(dailyTasksForDay)) {
-                        if (task.skills.some(skill => !target.skills.includes(skill))) continue;
+                    for (const task of schedulableTasksForTarget) {
+                        const entries = [
+                           { taskId: 'start', endTime: dayStart.toISOString(), location: target.home_location },
+                           ...ts.schedule.map(e => ({...e, location: allTaskOccurrences.find(t=>t.id === e.taskId)?.location!}))
+                        ].sort((a,b) => parseISO(a.endTime).getTime() - parseISO(b.endTime).getTime());
 
-                        for (let i = 0; i < allEntries.length; i++) {
-                            const prevEntry = allEntries[i];
-                            const nextEntry = i + 1 < allEntries.length ? allEntries[i+1] : null;
+                        for (let i = 0; i < entries.length; i++) {
+                            const prevEntry = entries[i];
+                            const nextEntry = i + 1 < entries.length ? entries[i+1] : null;
 
-                            const prevTask = allTaskOccurrences.find(t => t.id === prevEntry.taskId);
-                            const prevLocation = prevTask?.location || target.home_location;
-                            const lastTaskEnd = parseISO(prevEntry.endTime);
-
-                            const travelTime = Math.round(getDistance(prevLocation.lat, prevLocation.lng, task.location.lat, task.location.lng) / vehicleSpeed * 60);
-                            let potentialStartTime = addMinutes(lastTaskEnd, travelTime);
-
-                            if (task.startTime) {
+                            const travelTime = Math.round(getDistance(prevEntry.location.lat, prevEntry.location.lng, task.location.lat, task.location.lng) / vehicleSpeed * 60);
+                            let potentialStartTime = addMinutes(parseISO(prevEntry.endTime), travelTime);
+                             if (task.startTime) {
                                 const taskSpecificStart = setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0);
                                 if (isAfter(taskSpecificStart, potentialStartTime)) {
                                     potentialStartTime = taskSpecificStart;
                                 }
                             }
                             const potentialEndTime = addMinutes(potentialStartTime, task.duration);
-                            
-                            const specificEndTime = task.endTime ? setSeconds(setMinutes(setHours(currentDate, task.endTime.getHours()), task.endTime.getMinutes()), 0) : null;
-                            const dayEnd = dayEndWithExtension;
-
-                            let valid = potentialEndTime <= dayEnd && (!specificEndTime || potentialEndTime <= specificEndTime);
-                            
-                            if (valid && nextEntry) {
-                                const nextTask = allTaskOccurrences.find(t => t.id === nextEntry.taskId)!;
-                                const travelToNext = Math.round(getDistance(task.location.lat, task.location.lng, nextTask.location.lat, nextTask.location.lng) / vehicleSpeed * 60);
-                                valid = addMinutes(potentialEndTime, travelToNext) <= parseISO(nextEntry.startTime);
+                             const specificEndTime = task.endTime ? setSeconds(setMinutes(setHours(currentDate, task.endTime.getHours()), task.endTime.getMinutes()), 0) : null;
+                             if (potentialEndTime > dayEndWithExtension || (specificEndTime && potentialEndTime > specificEndTime)) {
+                                continue;
                             }
 
-                            if (valid) {
-                                const idle = differenceInMinutes(potentialStartTime, lastTaskEnd) - travelTime;
-                                if (idle < minIdle) {
-                                    minIdle = idle;
-                                    bestTask = task;
-                                    bestEntry = {
-                                        taskId: task.id,
-                                        startTime: potentialStartTime.toISOString(),
-                                        endTime: potentialEndTime.toISOString(),
-                                        travelTimeFromPrevious: travelTime,
-                                    };
+                            let isValidFit = true;
+                            if (nextEntry) {
+                                const travelToNext = Math.round(getDistance(task.location.lat, task.location.lng, nextEntry.location.lat, nextEntry.location.lng) / vehicleSpeed * 60);
+                                if (addMinutes(potentialEndTime, travelToNext) > parseISO(nextEntry.startTime)) {
+                                    isValidFit = false;
                                 }
                             }
+                             if (isValidFit) {
+                                 const idleTime = differenceInMinutes(potentialStartTime, parseISO(prevEntry.endTime)) - travelTime;
+                                 if (idleTime < minIdle) {
+                                     minIdle = idleTime;
+                                     bestTask = task;
+                                     bestEntry = {
+                                         taskId: task.id,
+                                         startTime: potentialStartTime.toISOString(),
+                                         endTime: potentialEndTime.toISOString(),
+                                         travelTimeFromPrevious: travelTime,
+                                     };
+                                     bestInsertionIndex = i;
+                                 }
+                             }
                         }
                     }
 
@@ -577,10 +573,9 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
         datesToSchedule.forEach(currentDate => {
             const dateStr = format(currentDate, "yyyy-MM-dd");
             schedule[dateStr].forEach(ts => {
-                if (ts.schedule.length < 2) return;
+                if (ts.schedule.length < 1) return;
+                 ts.schedule.sort((a, b) => parseISO(a.startTime).getTime() - parseISO(b.startTime).getTime());
 
-                const target = targetsForScheduling.find(t => t.id === ts.targetId)!;
-                if (!target.schedules?.[0]) return;
 
                 // --- Backward pass (push tasks later) ---
                 for (let i = ts.schedule.length - 2; i >= 0; i--) {
@@ -590,25 +585,50 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     const nextTask = allTaskOccurrences.find(t => t.id === nextEntry.taskId)!;
                     
                     const travelBetween = Math.round(getDistance(currentTask.location.lat, currentTask.location.lng, nextTask.location.lat, nextTask.location.lng) / vehicleSpeed * 60);
+                    
                     const desiredStartTimeForCurrent = addMinutes(parseISO(nextEntry.startTime), - (travelBetween + currentTask.duration));
 
-                    const currentEndTime = parseISO(currentEntry.endTime);
+                    const currentStartTime = parseISO(currentEntry.startTime);
+                    
+                    if (isAfter(desiredStartTimeForCurrent, currentStartTime)) {
+                         const newStartTime = desiredStartTimeForCurrent;
+                         const newEndTime = addMinutes(newStartTime, currentTask.duration);
 
-                    if (isAfter(desiredStartTimeForCurrent, currentEndTime)) {
-                         const shiftableAmount = differenceInMinutes(desiredStartTimeForCurrent, parseISO(currentEntry.startTime));
-                         const newEndTime = addMinutes(currentEndTime, shiftableAmount);
-
-                         if (!currentTask.endTime || isBefore(newEndTime, currentTask.endTime)) {
-                            // Shift this task and all before it
-                            for(let j=0; j<=i; j++) {
-                                ts.schedule[j].startTime = addMinutes(parseISO(ts.schedule[j].startTime), shiftableAmount).toISOString();
-                                ts.schedule[j].endTime = addMinutes(parseISO(ts.schedule[j].endTime), shiftableAmount).toISOString();
-                            }
+                        const specificEndTime = currentTask.endTime ? setHours(setMinutes(setSeconds(currentDate, currentTask.endTime.getMinutes()), currentTask.endTime.getSeconds()), 0) : null;
+                         
+                         if (!specificEndTime || newEndTime <= specificEndTime) {
+                             currentEntry.startTime = newStartTime.toISOString();
+                             currentEntry.endTime = newEndTime.toISOString();
                          }
                     }
                 }
                 
                 // --- Forward pass (pull tasks earlier) ---
+                const target = targetsForScheduling.find(t => t.id === ts.targetId)!;
+                const [startHour, startMinute] = target.schedules![0].dayStarts.split(':').map(Number);
+                const dayStart = setSeconds(setMinutes(setHours(currentDate, startHour), startMinute), 0);
+                
+                // First task
+                const firstEntry = ts.schedule[0];
+                const firstTask = allTaskOccurrences.find(t => t.id === firstEntry.taskId)!;
+                const travelFromHome = Math.round(getDistance(target.home_location.lat, target.home_location.lng, firstTask.location.lat, firstTask.location.lng) / vehicleSpeed * 60);
+                let earliestPossibleStart = addMinutes(dayStart, travelFromHome);
+
+                 if (firstTask.startTime) {
+                    const taskSpecificStart = setSeconds(setMinutes(setHours(currentDate, firstTask.startTime.getHours()), firstTask.startTime.getMinutes()), 0);
+                    if (isAfter(taskSpecificStart, earliestPossibleStart)) {
+                        earliestPossibleStart = taskSpecificStart;
+                    }
+                }
+                
+                let shiftAmount = differenceInMinutes(parseISO(firstEntry.startTime), earliestPossibleStart);
+
+                if (shiftAmount > 0) {
+                    firstEntry.startTime = addMinutes(parseISO(firstEntry.startTime), -shiftAmount).toISOString();
+                    firstEntry.endTime = addMinutes(parseISO(firstEntry.endTime), -shiftAmount).toISOString();
+                }
+
+                // Subsequent tasks
                 for (let i = 1; i < ts.schedule.length; i++) {
                     const prevEntry = ts.schedule[i-1];
                     const currentEntry = ts.schedule[i];
@@ -619,19 +639,19 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     const travelBetween = Math.round(getDistance(prevTask.location.lat, prevTask.location.lng, currentTask.location.lat, currentTask.location.lng) / vehicleSpeed * 60);
                     const desiredStartTime = addMinutes(parseISO(prevEntry.endTime), travelBetween);
 
-                    let earliestPossibleStart = desiredStartTime;
+                    earliestPossibleStart = desiredStartTime;
                     if (currentTask.startTime) {
                         const taskSpecificStart = setSeconds(setMinutes(setHours(currentDate, currentTask.startTime.getHours()), currentTask.startTime.getMinutes()), 0);
                         if(isAfter(taskSpecificStart, earliestPossibleStart)) {
                             earliestPossibleStart = taskSpecificStart;
                         }
                     }
+                    
+                    shiftAmount = differenceInMinutes(parseISO(currentEntry.startTime), earliestPossibleStart);
 
-                    const currentStartTime = parseISO(currentEntry.startTime);
-                    if(isAfter(currentStartTime, earliestPossibleStart)) {
-                        const shiftableAmount = differenceInMinutes(currentStartTime, earliestPossibleStart);
-                        currentEntry.startTime = earliestPossibleStart.toISOString();
-                        currentEntry.endTime = addMinutes(parseISO(currentEntry.endTime), -shiftableAmount).toISOString();
+                    if(shiftAmount > 0) {
+                        currentEntry.startTime = addMinutes(parseISO(currentEntry.startTime), -shiftAmount).toISOString();
+                        currentEntry.endTime = addMinutes(parseISO(currentEntry.endTime), -shiftAmount).toISOString();
                     }
                 }
             });
@@ -1438,24 +1458,3 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
-
-    
-
-    
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-    
-
-    
