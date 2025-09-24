@@ -25,6 +25,7 @@ import {
   Clock,
   Pencil,
   FileText,
+  Repeat,
 } from "lucide-react";
 import { format, addMinutes, startOfDay, addDays, eachDayOfInterval, parseISO, setHours, setMinutes, setSeconds, isWithinInterval, isAfter } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -1012,6 +1013,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                           <TableHead>Segment</TableHead>
                           <TableHead>Skills</TableHead>
                           <TableHead>Duration</TableHead>
+                          <TableHead>Repeats (days)</TableHead>
                           <TableHead className="w-[80px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1058,6 +1060,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                             <TableCell>{task.segment}</TableCell>
                             <TableCell>{task.skills?.join(', ')}</TableCell>
                             <TableCell>{task.duration} min</TableCell>
+                            <TableCell>{task.repeatInterval || 'N/A'}</TableCell>
                             <TableCell>
                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingTask(task)}>
                                 <Pencil className="h-4 w-4" />
@@ -1286,5 +1289,6 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
 
     
+
 
 

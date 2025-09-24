@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -33,6 +34,7 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
     const [segment, setSegment] = React.useState<string | undefined>("");
     const [skills, setSkills] = React.useState<string[]>([]);
     const [newSkill, setNewSkill] = React.useState("");
+    const [repeatInterval, setRepeatInterval] = React.useState<number | undefined>();
 
 
   React.useEffect(() => {
@@ -46,6 +48,7 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
       setPriority(currentTask.priority);
       setSegment(currentTask.segment);
       setSkills(currentTask.skills || []);
+      setRepeatInterval(currentTask.repeatInterval);
     } else if (isNew) {
         // Reset for new task
         setName("");
@@ -57,6 +60,7 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
         setPriority("medium");
         setSegment("");
         setSkills([]);
+        setRepeatInterval(undefined);
     }
   }, [task, currentTask, isNew]);
 
@@ -72,6 +76,7 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
       priority,
       segment,
       skills,
+      repeatInterval,
     };
     onSave(updatedTask);
   };
@@ -141,6 +146,17 @@ export function EditTaskDialog({ task, onSave, onClose }: EditTaskDialogProps) {
            <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="segment" className="text-right">Segment</Label>
             <Input id="segment" value={segment} onChange={(e) => setSegment(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="repeatInterval" className="text-right">Repeats (days)</Label>
+            <Input 
+                id="repeatInterval" 
+                type="number" 
+                value={repeatInterval === undefined ? '' : repeatInterval} 
+                onChange={(e) => setRepeatInterval(e.target.value === '' ? undefined : Number(e.target.value))} 
+                className="col-span-3" 
+                placeholder="e.g., 7 for weekly"
+            />
           </div>
            <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="skills" className="text-right">Skills</Label>
