@@ -2,12 +2,23 @@
 
 import * as React from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import type { Target } from "@/lib/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 interface EditTargetDialogProps {
   target: Target | null;
@@ -145,10 +156,26 @@ export function EditTargetDialog({ target, onSave, onClose, onDelete }: EditTarg
         <DialogFooter className="flex justify-between w-full">
             <div>
               {!isNew && (
-                  <Button variant="destructive" onClick={handleDelete}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                       <Button variant="destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure you want to delete this target?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the target and remove them from any schedules.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
              <div>
