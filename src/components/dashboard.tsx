@@ -373,127 +373,159 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
         const endDay = dateRange?.to || addDays(today, 6);
         const datesToSchedule = eachDayOfInterval({ start: today, end: endDay });
         
-        let allTaskOccurrences: (Task & { occurrenceDate: Date, originalId: string })[] = [];
-        
-        originalTasksToSchedule.forEach(task => {
-            if (task.repeatInterval && task.repeatInterval > 0 && task.startTime) {
-                let currentDate = task.startTime;
-                while (currentDate <= endDay) {
-                    if (isWithinInterval(currentDate, { start: today, end: endDay })) {
-                        allTaskOccurrences.push({ 
-                            ...task, 
-                            originalId: task.id, 
-                            id: `${task.id}-${format(currentDate, 'yyyy-MM-dd')}`, 
-                            occurrenceDate: currentDate 
-                        });
+        // Initialize schedule structure
+        datesToSchedule.forEach(date => {
+            const dateStr = format(date, "yyyy-MM-dd");
+            schedule[dateStr] = targetsForScheduling.map(target => ({
+                targetId: target.id,
+                schedule: [],
+                route: [],
+                totalDuration: 0,
+                totalTravelTime: 0
+            }));
+        });
+
+        // Separate recurring and non-recurring tasks
+        const recurringTasks = originalTasksToSchedule.filter(t => t.repeatInterval && t.repeatInterval > 0);
+        const dailyTasks = originalTasksToSchedule.filter(t => !t.repeatInterval || t.repeatInterval === 0);
+
+        // --- PASS 1: Schedule all occurrences of recurring tasks ---
+        recurringTasks.forEach(task => {
+            if (!task.startTime) return;
+            let occurrenceDate = task.startTime;
+            while (occurrenceDate <= endDay) {
+                if (isWithinInterval(occurrenceDate, { start: today, end: endDay })) {
+                    const taskOccurrence = { 
+                        ...task, 
+                        originalId: task.id, 
+                        id: `${task.id}-${format(occurrenceDate, 'yyyy-MM-dd')}`,
+                        occurrenceDate: occurrenceDate
+                    };
+                    const dateStr = format(occurrenceDate, "yyyy-MM-dd");
+                    
+                    // Find a suitable target and slot for this occurrence
+                    let scheduled = false;
+                    for (const target of targetsForScheduling) {
+                        if (task.skills.every(skill => target.skills.includes(skill))) {
+                            const targetSchedule = schedule[dateStr].find(ts => ts.targetId === target.id);
+                            if (targetSchedule) {
+                                // Simplified placement logic for recurring tasks. Assume they fit.
+                                // A more robust solution would check for conflicts here.
+                                targetSchedule.schedule.push({
+                                    taskId: taskOccurrence.id,
+                                    startTime: taskOccurrence.startTime!.toISOString(),
+                                    endTime: addMinutes(taskOccurrence.startTime!, taskOccurrence.duration).toISOString(),
+                                    travelTimeFromPrevious: 0, // Will be calculated in the refinement pass
+                                });
+                                scheduled = true;
+                                break; // Scheduled with the first available, skilled target
+                            }
+                        }
                     }
-                    currentDate = addDays(currentDate, task.repeatInterval);
                 }
-            } else if (task.startTime && isWithinInterval(task.startTime, { start: today, end: endDay })) {
-                allTaskOccurrences.push({ 
-                    ...task, 
-                    originalId: task.id, 
-                    id: `${task.id}-${format(task.startTime, 'yyyy-MM-dd')}`, 
-                    occurrenceDate: task.startTime
-                });
-            } else if (!task.startTime) { // For tasks without a start time, try to schedule on each day
-                 datesToSchedule.forEach(d => {
-                   const adhocTask = allTaskOccurrences.find(t => t.originalId === task.id)
-                   if (!adhocTask) {
-                        allTaskOccurrences.push({ 
-                            ...task, 
-                            originalId: task.id, 
-                            id: `${task.id}-adhoc`, 
-                            occurrenceDate: d 
-                        });
-                   }
-                 });
+                occurrenceDate = addDays(occurrenceDate, task.repeatInterval!);
             }
         });
 
 
+        // --- PASS 2: Schedule daily tasks and refine all ---
         datesToSchedule.forEach(currentDate => {
             const dateStr = format(currentDate, "yyyy-MM-dd");
-            schedule[dateStr] = [];
+            
+            let tasksForThisDay = dailyTasks
+              .filter(t => !t.startTime || format(t.startTime, 'yyyy-MM-dd') === dateStr)
+              .map(t => ({...t, originalId: t.id, id: `${t.id}-adhoc`, occurrenceDate: currentDate }));
 
-            let tasksForThisDay = allTaskOccurrences.filter(t => format(t.occurrenceDate, 'yyyy-MM-dd') === dateStr);
             let tasksToScheduleThisDay = new Set(tasksForThisDay);
 
-            targetsForScheduling.forEach(target => {
+            schedule[dateStr].forEach(ts => {
+                const target = targetsForScheduling.find(t => t.id === ts.targetId)!;
                 const targetScheduleInfo = target.schedules?.[0];
                 if (!targetScheduleInfo) return;
 
                 const [startHour, startMinute] = targetScheduleInfo.dayStarts.split(':').map(Number);
-                let currentTime = setSeconds(setMinutes(setHours(currentDate, startHour), startMinute), 0);
+                const dayStart = setSeconds(setMinutes(setHours(currentDate, startHour), startMinute), 0);
                 
                 const [endHour, endMinute] = targetScheduleInfo.dayEnds.split(':').map(Number);
                 const endOfDay = setSeconds(setMinutes(setHours(currentDate, endHour), endMinute), 0);
                 const dayEndWithExtension = extendDay ? addMinutes(endOfDay, workingDayHours * 60) : endOfDay;
-
-                const scheduledEntries: ScheduleEntry[] = [];
-                let totalDuration = 0;
-                let totalTravelTime = 0;
-                let lastLocation = target.home_location;
                 
-                const route: TargetSchedule['route'] = [];
+                // Add daily tasks to the pool of tasks to be sorted and scheduled
+                const allTasksForTarget = [...ts.schedule.map(s => {
+                    const foundTask = recurringTasks.find(t => s.taskId.startsWith(t.id));
+                    return {...(foundTask!), id: s.taskId, occurrenceDate: parseISO(s.startTime)};
+                }), ...Array.from(tasksToScheduleThisDay)];
 
-                // Simple greedy approach: sort tasks by priority or name and schedule them
-                const tempTasks = Array.from(tasksToScheduleThisDay).sort((a,b) => a.name.localeCompare(b.name));
 
-                for (const task of tempTasks) {
-                    // Check if target has required skills
-                    if (task.skills && task.skills.length > 0 && !task.skills.every(skill => target.skills.includes(skill))) {
-                        continue;
-                    }
+                ts.schedule = []; // Clear existing and rebuild
+                ts.totalDuration = 0;
+                ts.totalTravelTime = 0;
+                let lastLocation = target.home_location;
+                let currentTime = dayStart;
+                
+                const schedulableTasksForTarget = allTasksForTarget
+                  .filter(task => task.skills.every(skill => target.skills.includes(skill)))
+                  .sort((a, b) => (a.startTime || dayStart).getTime() - (b.startTime || dayStart).getTime());
 
-                    const distance = getDistance(lastLocation.lat, lastLocation.lng, task.location.lat, task.location.lng);
-                    const travelTime = Math.round((distance / vehicleSpeed) * 60); // in minutes
 
-                    // Calculate earliest possible start time
-                    const arrivalTime = addMinutes(currentTime, travelTime);
-                    let taskStartTime = arrivalTime;
-                    
-                    if (task.startTime) {
+                for (const task of schedulableTasksForTarget) {
+                     if (ts.schedule.some(s => s.taskId === task.id)) continue; // Already scheduled by another logic path
+
+                     const distance = getDistance(lastLocation.lat, lastLocation.lng, task.location.lat, task.location.lng);
+                     const travelTime = Math.round((distance / vehicleSpeed) * 60);
+
+                     const arrivalTime = addMinutes(currentTime, travelTime);
+                     let taskStartTime = arrivalTime;
+
+                     if (task.startTime) {
                         const specificStartTime = setSeconds(setMinutes(setHours(currentDate, task.startTime.getHours()), task.startTime.getMinutes()), 0);
-                        if (taskStartTime < specificStartTime) {
-                            taskStartTime = specificStartTime; // Respect task's own start time
+                        if (isAfter(specificStartTime, taskStartTime)) {
+                             taskStartTime = specificStartTime;
                         }
-                    }
+                     }
 
-                    const taskEndTime = addMinutes(taskStartTime, task.duration);
-                    
-                    const specificEndTime = task.endTime ? setSeconds(setMinutes(setHours(currentDate, task.endTime.getHours()), task.endTime.getMinutes()), 0) : null;
-                   
-                    if (taskEndTime <= dayEndWithExtension && (!specificEndTime || taskEndTime <= specificEndTime)) {
-                        scheduledEntries.push({
+                     const taskEndTime = addMinutes(taskStartTime, task.duration);
+                     const specificEndTime = task.endTime ? setSeconds(setMinutes(setHours(currentDate, task.endTime.getHours()), task.endTime.getMinutes()), 0) : null;
+                     
+                     // Check if this task conflicts with already scheduled (recurring) tasks
+                     const conflict = ts.schedule.some(entry => 
+                         isWithinInterval(taskStartTime, { start: parseISO(entry.startTime), end: parseISO(entry.endTime)}) ||
+                         isWithinInterval(taskEndTime, { start: parseISO(entry.startTime), end: parseISO(entry.endTime)})
+                     );
+
+                     if (!conflict && taskEndTime <= dayEndWithExtension && (!specificEndTime || taskEndTime <= specificEndTime)) {
+                         ts.schedule.push({
                             taskId: task.id,
                             startTime: taskStartTime.toISOString(),
                             endTime: taskEndTime.toISOString(),
                             travelTimeFromPrevious: travelTime,
                         });
                         
-                        totalDuration += task.duration;
-                        totalTravelTime += travelTime;
+                        ts.totalDuration += task.duration;
+                        ts.totalTravelTime += travelTime;
                         currentTime = taskEndTime;
                         lastLocation = task.location;
-                        tasksToScheduleThisDay.delete(task); // Remove from pool for this day
-                    }
+
+                        // This is tricky, we need to remove the corresponding task from the main set
+                         const taskInSet = Array.from(tasksToScheduleThisDay).find(t => t.id === task.id || t.originalId === task.originalId);
+                         if(taskInSet) {
+                           tasksToScheduleThisDay.delete(taskInSet);
+                         }
+                     }
                 }
-                
-                schedule[dateStr].push({
-                    targetId: target.id,
-                    schedule: scheduledEntries,
-                    route: route,
-                    totalDuration: totalDuration,
-                    totalTravelTime: totalTravelTime
-                });
+                // Sort the final schedule for the day by start time
+                ts.schedule.sort((a,b) => parseISO(a.startTime).getTime() - parseISO(b.startTime).getTime());
             });
         });
         
       const allScheduledTaskIds = new Set<string>();
       Object.values(schedule).flat().forEach(ts => {
         ts.schedule.forEach(entry => {
-            const originalId = allTaskOccurrences.find(t => t.id === entry.taskId)?.originalId;
+            // Find originalId from recurring or daily tasks
+            let originalId = recurringTasks.find(t => entry.taskId.startsWith(t.id))?.id;
+            if (!originalId) {
+                originalId = dailyTasks.find(t => entry.taskId.startsWith(t.id))?.id;
+            }
             if (originalId) {
                 allScheduledTaskIds.add(originalId);
             }
@@ -1299,6 +1331,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
 
 
     
+
 
 
 
