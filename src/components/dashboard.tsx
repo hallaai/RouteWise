@@ -392,7 +392,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 let currentDate = task.startTime;
                 
                 while (isBefore(currentDate, endDay) || format(currentDate, 'yyyy-MM-dd') === format(endDay, 'yyyy-MM-dd')) {
-                     if (isAfter(currentDate, today) || format(currentDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+                     if (isWithinInterval(currentDate, { start: today, end: addDays(endDay, 1) })) {
                          allTaskOccurrences.push({
                             ...task,
                             id: `${task.id}-${format(currentDate, 'yyyyMMdd')}`,
@@ -527,11 +527,12 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                     
                     if (isAfter(desiredStartTime, currentStartTime)) {
                          let newStartTime = desiredStartTime;
-                         const specificEndTime = currentTask.endTime ? setHours(setMinutes(setSeconds(currentDate, 0), currentTask.endTime.getMinutes()), currentTask.endTime.getHours()) : null;
+                         const specificEndTime = currentTask.endTime ? setSeconds(setMinutes(setHours(currentDate, currentTask.endTime.getMinutes()), currentTask.endTime.getHours()), 0) : null;
+
                          if (specificEndTime) {
-                            const newEndTimeWithConstraint = addMinutes(specificEndTime, -currentTask.duration);
-                            if (isBefore(newStartTime, newEndTimeWithConstraint)) {
-                                newStartTime = newEndTimeWithConstraint;
+                            const maxPossibleStartTime = addMinutes(specificEndTime, -currentTask.duration);
+                            if (isBefore(maxPossibleStartTime, newStartTime)) {
+                                newStartTime = maxPossibleStartTime;
                             }
                          }
 
@@ -541,28 +542,36 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                 }
                 
                 // --- Forward pass (pull tasks earlier) ---
-                const [startHour, startMinute] = target.schedules![0].dayStarts.split(':').map(Number);
+                const targetScheduleInfo = target.schedules?.[0];
+                if (!targetScheduleInfo) return;
+                const [startHour, startMinute] = targetScheduleInfo.dayStarts.split(':').map(Number);
                 const dayStart = setSeconds(setMinutes(setHours(currentDate, startHour), startMinute), 0);
                 
                 let lastTaskEndTime = dayStart;
                 let lastLocation = target.home_location;
 
+                if (includeHomeTravel.start) {
+                  // No change needed here, handled by travelTime below
+                } else {
+                  lastTaskEndTime = dayStart;
+                }
+
                 for (let i = 0; i < ts.schedule.length; i++) {
                     const currentEntry = ts.schedule[i];
                     const currentTask = allTaskOccurrences.find(t => t.id === currentEntry.taskId)!;
                     const travelTime = Math.round(getDistance(lastLocation.lat, lastLocation.lng, currentTask.location.lat, currentTask.location.lng) / vehicleSpeed * 60);
+                    currentEntry.travelTimeFromPrevious = travelTime;
                     
                     let desiredStartTime = addMinutes(lastTaskEndTime, travelTime);
                     
-                    const taskSpecificStart = currentTask.startTime ? setHours(setMinutes(setSeconds(currentDate, 0), currentTask.startTime.getMinutes()), currentTask.startTime.getHours()) : null;
+                    const taskSpecificStart = currentTask.startTime ? setSeconds(setMinutes(setHours(currentDate, currentTask.startTime.getMinutes()), currentTask.startTime.getHours()), 0) : null;
                     if(taskSpecificStart && isAfter(taskSpecificStart, desiredStartTime)){
                         desiredStartTime = taskSpecificStart;
                     }
 
-                    if (isBefore(desiredStartTime, parseISO(currentEntry.startTime))) {
-                        currentEntry.startTime = desiredStartTime.toISOString();
-                        currentEntry.endTime = addMinutes(desiredStartTime, currentTask.duration).toISOString();
-                    }
+                    // No need to check isBefore, we just re-set it to the packed time.
+                    currentEntry.startTime = desiredStartTime.toISOString();
+                    currentEntry.endTime = addMinutes(desiredStartTime, currentTask.duration).toISOString();
 
                     lastTaskEndTime = parseISO(currentEntry.endTime);
                     lastLocation = currentTask.location;
@@ -1371,6 +1380,8 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
+
+    
 
     
 
