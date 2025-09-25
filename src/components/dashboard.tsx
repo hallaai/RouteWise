@@ -1298,7 +1298,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
                                                       onClick={(e) => handleTaskGroupClick(task.originalId!, e)}
                                                       className={cn(
                                                         "absolute h-full rounded-md p-2 flex items-center justify-center text-white text-xs font-bold shadow-md hover:opacity-90 transition-all cursor-pointer",
-                                                        isGroupActive && "ring-2 ring-offset-2 ring-accent"
+                                                        isGroupActive && "ring-4 ring-offset-2 ring-yellow-400"
                                                       )}
                                                       style={{
                                                         left: `${left}%`,
@@ -1371,5 +1371,7 @@ export function Dashboard({ appState, setAppState }: DashboardProps) {
     </div>
   );
 }
+
+    
 
     
