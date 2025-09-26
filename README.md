@@ -21,20 +21,19 @@ The application takes into account numerous constraints such as worker skills, a
 
 ### The Route Optimization Algorithm
 
-The core of the application is its scheduling and routing engine. While the current version uses a fast and effective **greedy algorithm**, it is designed to be extendable with more advanced AI-powered optimizers using Genkit.
+The core of the application is its sophisticated scheduling and routing engine. It employs a multi-stage process to ensure both correct task assignment and high efficiency.
 
-Here is how the current process works:
+1.  **Data Ingestion & Task Expansion:** The user selects a date range and the sets of tasks and targets to be scheduled. The system then identifies all occurrences of these tasks within the selected range, accounting for recurring tasks (e.g., weekly maintenance).
 
-1.  **Data Ingestion:** The user selects a date range and a set of tasks and targets to be scheduled.
-2.  **Task Expansion:** The system identifies all occurrences of tasks within the selected date range, accounting for recurring tasks (e.g., weekly maintenance).
-3.  **Daily Scheduling Loop:** For each day in the range, the engine iterates through the available targets.
-4.  **Greedy Task Assignment:** For each target, the algorithm greedily selects the best available task from the pool of unscheduled tasks for that day. The selection process considers:
-    -   **Skill Matching:** It only considers tasks for which the target possesses the required skills.
-    -   **Time Windows:** It respects any start/end time constraints on a task.
-    -   **Proximity:** It sorts remaining tasks by name (as a simple heuristic) and picks the first one that fits.
-5... **Time Calculation:** The engine calculates the travel time from the target's last known location (either their home base or the previous task) to the new task.
-6.  **Schedule Validation:** A task is only added to a target's schedule if it can be completed within their working hours (including any configured extensions).
-7.  **Iteration:** This process repeats until all possible tasks for the day are scheduled or no more tasks can fit into any target's schedule.
+2.  **Two-Pass Greedy Assignment:** The engine uses a two-pass greedy algorithm to assign tasks day by day. This ensures recurring tasks are prioritized.
+    -   **Pass 1 (Recurring Tasks):** It first schedules all recurring tasks, ensuring these fixed commitments are placed on the calendar.
+    -   **Pass 2 (Daily Tasks):** It then schedules the remaining daily (non-recurring) tasks. For each daily task, the algorithm evaluates all available and qualified workers to find the **best fit**. The best fit is the worker who can perform the task with the minimum "cost," calculated as a combination of travel time and potential idle time. This task-centric approach ensures that workers with non-standard hours (e.g., part-timers) are utilized effectively.
+
+3.  **Two-Way Packing Optimization:** After the initial assignments are made, a final optimization pass runs to "pack" the schedule and minimize idle time.
+    -   **Backward Pass:** Starting from the end of each worker's day, the algorithm pushes tasks as late as possible, closing gaps before tasks that have a fixed `startTime`. This prevents long, unnecessary waits.
+    -   **Forward Pass:** It then performs a forward pass from the start of the day, pulling tasks as early as possible to fill any remaining idle slots. This "squeezes" the schedule from both directions, resulting in a tightly packed and efficient workday.
+
+4.  **Schedule Validation:** Throughout the process, every assignment is validated against constraints like worker skills, task time windows (`startTime`, `endTime`), and the worker's shift hours.
 
 ### Unscheduled Task Handling
 
